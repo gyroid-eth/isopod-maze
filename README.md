@@ -15,7 +15,7 @@ A single-file, browser-based **parametric maze generator for 3D-printable isopod
 ![Random maze mode](screenshots/random-maze.png)
 
 ### Random maze — TA solution (turn alternation)
-Every turn is a T-junction; the unique solution requires strict R/L alternation (labelled on the path).
+Every turn is a T-junction; the unique solution requires strict R/L alternation (labelled on the path). The amber **Alternations** panel sets how many turns the solution has (AUTO or a fixed count).
 ![TA solution](screenshots/ta-solution.png)
 
 ### 3D preview
