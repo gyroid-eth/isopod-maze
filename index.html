@@ -928,6 +928,21 @@ function redraw2D() {
     ctx.fillStyle='rgba(0,0,0,0.7)'; ctx.fillRect(bx-tw/2-4,by-8,tw+8,14);
     ctx.fillStyle='#ffc800'; ctx.fillText(stepsText,bx,by+3);
 
+    // R/L turn labels along the solution (動物視点: 緑=L / ピンク=R)
+    ctx.textBaseline='middle'; ctx.font='bold 10px Orbitron, monospace';
+    const rad = Math.max(7, Math.min(ms(Math.min(cellW,cellH)*0.4), 11));
+    for (let i=1;i<path.length-1;i++){
+      const a=path[i-1], b=path[i], d=path[i+1];
+      const cross=(b[0]-a[0])*(d[1]-b[1]) - (b[1]-a[1])*(d[0]-b[0]);
+      if (cross===0) continue; // 直進はスキップ
+      const lbl = cross>0 ? 'L' : 'R';
+      const lx=mx(b[1]*stepX+wallT+cellW/2), ly=my(b[0]*stepY+wallT+cellH/2);
+      ctx.fillStyle='rgba(4,9,24,0.82)'; ctx.beginPath(); ctx.arc(lx,ly,rad,0,Math.PI*2); ctx.fill();
+      ctx.lineWidth=1; ctx.strokeStyle=lbl==='L'?'#00ff88':'#ff5e8a'; ctx.stroke();
+      ctx.fillStyle=lbl==='L'?'#00ff88':'#ff5e8a'; ctx.fillText(lbl,lx,ly+0.5);
+    }
+    ctx.textBaseline='alphabetic';
+
     ctx.restore();
   }
 
