@@ -172,6 +172,10 @@
         <div class="param-header"><span class="param-label">Openness</span><span class="param-value" id="v-openness">20<span class="unit">%</span></span></div>
         <input type="range" id="p-openness" min="0" max="80" value="20" step="5">
       </div>
+      <label class="toggle-row" style="margin-top:11px">
+        <input type="checkbox" id="p-ta">
+        <span class="toggle-label">TA解 (交替性転向でしか解けない)</span>
+      </label>
     </div>
 
     <div class="section mode-maze">
@@ -242,10 +246,6 @@
         <div class="opening-label">最初の分岐 (J1)</div>
         <select id="p-firstturn"><option value="right" selected>右折 (Right)</option><option value="left">左折 (Left)</option></select>
       </div>
-      <label class="toggle-row" style="margin-top:11px">
-        <input type="checkbox" id="p-fillmaze">
-        <span class="toggle-label">背景を迷路で埋める (装飾)</span>
-      </label>
       <div class="cell-derived" style="margin-top:11px">
         <span class="cell-derived-label">PLATE</span>
         <span class="cell-derived-val" id="derived-plate">—</span>
@@ -319,9 +319,10 @@ function getParams() {
   const wallH  = parseFloat(document.getElementById('p-height').value);
   const floorT = parseFloat(document.getElementById('p-floor').value);
   const openness = parseInt(document.getElementById('p-openness').value);
+  const ta = document.getElementById('p-ta').checked;
   const cellW  = (totalW - (cols + 1) * wallT) / cols;
   const cellH  = (totalH - (rows + 1) * wallT) / rows;
-  return { rows, cols, totalW, totalH, wallT, wallH, floorT, openness, cellW, cellH };
+  return { rows, cols, totalW, totalH, wallT, wallH, floorT, openness, ta, cellW, cellH };
 }
 
 function resolveOpeningCol(pos, cols) {
@@ -361,6 +362,37 @@ function generateMaze(rows, cols, opennessPct, rng) {
     }
   }
   return walls;
+}
+
+// ── TA maze: 唯一解が「交替ターンの階段」になる perfect maze ──
+// 解を先に彫り(S,E,S,E… の階段=厳密な左右交互)、残りを枝として生やす（閉路なし=唯一解）。
+// vstep/hstep を縦横比で調整するので任意の rows×cols に収まる。
+function generateTAMaze(rows, cols, rng) {
+  const walls = Array.from({length:rows}, () => Array.from({length:cols}, () => ({N:true,S:true,E:true,W:true})));
+  const visited = Array.from({length:rows}, () => new Array(cols).fill(false));
+  let k = Math.max(2, Math.min(6, Math.floor(Math.min(rows,cols)/2)));
+  let vstep = Math.floor((rows-1)/k), hstep = Math.floor((cols-1)/k);
+  while ((vstep<1 || hstep<1) && k>1) { k--; vstep=Math.floor((rows-1)/k); hstep=Math.floor((cols-1)/k); }
+  vstep=Math.max(1,vstep); hstep=Math.max(1,hstep);
+  let r=0, c=0; visited[0][0]=true; const sol=[[0,0]];
+  function carve(nr,nc,f,t){ walls[r][c][f]=false; walls[nr][nc][t]=false; r=nr; c=nc; visited[r][c]=true; sol.push([r,c]); }
+  for (let i=0;i<k;i++) {
+    for (let s=0;s<vstep && r<rows-1;s++) carve(r+1,c,'S','N');   // descend
+    for (let s=0;s<hstep && c<cols-1;s++) carve(r,c+1,'E','W');   // step right
+  }
+  while (r<rows-1) carve(r+1,c,'S','N');                          // straight tail to bottom
+  const entranceCol=0, exitCol=c;
+  // grow a spanning tree around the carved solution → perfect maze, unique solution = sol
+  const DIRS=[{dr:-1,dc:0,f:'N',t:'S'},{dr:1,dc:0,f:'S',t:'N'},{dr:0,dc:-1,f:'W',t:'E'},{dr:0,dc:1,f:'E',t:'W'}];
+  const stack=sol.slice();
+  while (stack.length) {
+    const [cr,cc]=stack[stack.length-1];
+    const nb=DIRS.map(d=>({nr:cr+d.dr,nc:cc+d.dc,d})).filter(o=>o.nr>=0&&o.nr<rows&&o.nc>=0&&o.nc<cols&&!visited[o.nr][o.nc]);
+    if (!nb.length) { stack.pop(); continue; }
+    const {nr,nc,d}=nb[Math.floor(rng()*nb.length)];
+    walls[cr][cc][d.f]=false; walls[nr][nc][d.t]=false; visited[nr][nc]=true; stack.push([nr,nc]);
+  }
+  return { walls, entranceCol, exitCol, sol };
 }
 
 // ── BFS Solver ──
@@ -410,43 +442,7 @@ function getSTParams() {
     wallH:     parseFloat(document.getElementById('p-height').value),
     floorT:    parseFloat(document.getElementById('p-floor').value),
     firstTurn: document.getElementById('p-firstturn').value, // 'right' | 'left'
-    fillMaze:  document.getElementById('p-fillmaze').checked,
   };
-}
-
-// 装飾的背景迷路: 空き領域(void)を封印された迷路で埋める。構造はバッファ壁で隔離。
-function applyDecorativeFill(open, wall, cw, wallT, res, plateW, plateH) {
-  const rows = open.length, cols = open[0].length;
-  // 構造を bufCells 分ふくらませた保護マスク（構造と装飾を壁で隔てる）
-  const buf = Math.max(1, Math.round(wallT/res) + 1);
-  const prot = Array.from({length:rows}, () => new Array(cols).fill(false));
-  for (let r=0;r<rows;r++) for (let c=0;c<cols;c++) {
-    if (!(open[r][c] || wall[r][c])) continue;
-    for (let dr=-buf;dr<=buf;dr++) for (let dc=-buf;dc<=buf;dc++) {
-      const rr=r+dr, cc=c+dc; if (rr>=0&&rr<rows&&cc>=0&&cc<cols) prot[rr][cc]=true;
-    }
-  }
-  // 背景グリッド迷路（DFS, 固定seedで決定的）
-  const stepX = cw + wallT;
-  const dcols = Math.max(2, Math.floor((plateW - wallT) / stepX));
-  const drows = Math.max(2, Math.floor((plateH - wallT) / stepX));
-  const dwalls = generateMaze(drows, dcols, 0, makePRNG(1234));
-  const dwall = Array.from({length:rows}, () => new Array(cols).fill(false));
-  function fillW(x0,y0,x1,y1){
-    const c0=Math.max(0,Math.floor(x0/res)),c1=Math.min(cols-1,Math.ceil(x1/res)-1);
-    const r0=Math.max(0,Math.floor(y0/res)),r1=Math.min(rows-1,Math.ceil(y1/res)-1);
-    for(let r=r0;r<=r1;r++)for(let c=c0;c<=c1;c++){const px=c*res+res/2,py=r*res+res/2;
-      if(px>=x0&&px<=x1&&py>=y0&&py<=y1) dwall[r][c]=true;}
-  }
-  for(let r=0;r<=drows;r++)for(let c=0;c<=dcols;c++) fillW(c*stepX,r*stepX,c*stepX+wallT,r*stepX+wallT);
-  for(let r=0;r<=drows;r++)for(let c=0;c<dcols;c++){const hw=(r===0||r===drows)?true:dwalls[r][c].N; if(hw)fillW(c*stepX+wallT,r*stepX,c*stepX+wallT+cw,r*stepX+wallT);}
-  for(let r=0;r<drows;r++)for(let c=0;c<=dcols;c++){const hw=(c===0||c===dcols)?true:dwalls[r][c].W; if(hw)fillW(c*stepX,r*stepX+wallT,c*stepX+wallT,r*stepX+wallT+cw);}
-  // マージ: 構造はそのまま / バッファは壁 / それ以外は装飾
-  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
-    if(open[r][c]||wall[r][c]) continue;
-    if(prot[r][c]) { wall[r][c]=true; continue; }
-    if(dwall[r][c]) wall[r][c]=true; else open[r][c]=true;
-  }
 }
 
 function generateSerialT(p) {
@@ -507,7 +503,7 @@ function generateSerialT(p) {
   const altExit = {x:ex, y:ey, dir:sd};
 
   return { segments, stubs, junctions, trapEnds, altExit, cw, wallT:p.wallT, seg, stub,
-           plateW, plateH, path, firstTurn:p.firstTurn, fillMaze:p.fillMaze,
+           plateW, plateH, path, firstTurn:p.firstTurn,
            entrance, exit:goal };
 }
 
@@ -538,7 +534,6 @@ function rasterizeST(model, res) {
     }
     if(near) wall[r][c]=true;
   }
-  if (model.fillMaze) applyDecorativeFill(open, wall, cw, wallT, res, plateW, plateH);
   return {open, wall, cols, rows, res};
 }
 
@@ -767,9 +762,15 @@ function buildMaze(newSeed) {
   const p = getParams();
   updateDerivedCell(p);
   const rng = makePRNG(state.seed);
-  const walls = generateMaze(p.rows, p.cols, p.openness, rng);
-  const entranceCol = resolveOpeningCol(document.getElementById('p-entrance').value, p.cols);
-  const exitCol     = resolveOpeningCol(document.getElementById('p-exit').value, p.cols);
+  let walls, entranceCol, exitCol;
+  if (p.ta) {
+    const ta = generateTAMaze(p.rows, p.cols, rng);
+    walls = ta.walls; entranceCol = ta.entranceCol; exitCol = ta.exitCol;
+  } else {
+    walls = generateMaze(p.rows, p.cols, p.openness, rng);
+    entranceCol = resolveOpeningCol(document.getElementById('p-entrance').value, p.cols);
+    exitCol     = resolveOpeningCol(document.getElementById('p-exit').value, p.cols);
+  }
   state.maze = { rows: p.rows, cols: p.cols, walls, entranceCol, exitCol };
   state.path = solveMaze(state.maze);
   document.getElementById('seed-display').textContent = String(state.seed).padStart(6,'0');
@@ -1177,7 +1178,6 @@ ST_SLIDERS.forEach(({id,vid,fmt})=>{
   el.addEventListener('input',()=>{ vel.innerHTML=fmt(el.value); buildSerialT(); });
 });
 document.getElementById('p-firstturn').addEventListener('change',()=>buildSerialT());
-document.getElementById('p-fillmaze').addEventListener('change',()=>buildSerialT());
 
 // ── Mode switch ──
 const MODE_NOTES={
@@ -1201,6 +1201,7 @@ document.querySelectorAll('.mode-btn').forEach(b=>{
 ['p-entrance','p-exit'].forEach(id=>{
   document.getElementById(id).addEventListener('change',()=>buildMaze());
 });
+document.getElementById('p-ta').addEventListener('change',()=>buildMaze());
 document.getElementById('p-path').addEventListener('change',()=>{
   if (state.currentView==='2d') redraw2D(); else rebuild3D();
 });

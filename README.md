@@ -26,6 +26,8 @@ Isopods exhibit **turn alternation** (TA / 交替性転向): after turning right
 ### 1. Random Maze
 A classic square-grid maze (DFS recursive backtracker) with adjustable density ("openness" adds loops). Fully parametric overall size, wall height/thickness, floor thickness, and entrance/exit positions. The solution path is highlighted.
 
+Optionally enable **TA solution** to make the maze's *unique* solution a turn-alternating (R, L, R, L …) staircase: the whole plate is one continuous maze with uniform walls, but only an animal that keeps alternating its turns can reach the exit — every wrong turn leads into a dead-end branch. (This is the "fill the entire plate with one continuous maze" form of the turn-alternation experiment; openness and entrance/exit position are overridden in this mode.)
+
 ### 2. Serial T-Maze (連続T字 / experimental)
 A staircase of numbered T-junctions purpose-built for turn-alternation (TA) experiments:
 
@@ -35,7 +37,6 @@ A staircase of numbered T-junctions purpose-built for turn-alternation (TA) expe
 - **Corridor width** is exposed prominently — it must match the body width of your specimens (pill bugs are ~4–7 mm wide); a mismatched corridor breaks the behavior.
 - **Escapable exits**: the GOAL and the *first* junction's "wrong" branch are open exits (the first turn is a free reference turn, so both directions are valid). Every later wrong turn ends in a closed **dead-end trap** (marked ✕), so reaching the goal means the animal alternated correctly at every junction.
 - The first turn (right / left) is selectable, mirroring the whole maze.
-- Optional **decorative maze fill**: fills the empty background with a maze so the plate is a full rectangle. The solution structure stays walled-off and fully functional — it's purely cosmetic (the animal placed at START can never reach the background maze).
 
 ## Usage
 
