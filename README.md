@@ -28,9 +28,11 @@ Isopods exhibit **turn alternation** (TA / 交替性転向): after turning right
 ## Two modes
 
 ### 1. Random Maze
-A classic square-grid maze (DFS recursive backtracker) with adjustable density ("openness" adds loops). Fully parametric overall size, wall height/thickness, floor thickness, and entrance/exit positions. The solution path is highlighted.
+A classic square-grid maze (DFS recursive backtracker, up to **50 × 50** cells) with adjustable density ("openness" adds loops). Fully parametric overall size, wall height/thickness, floor thickness, and entrance/exit positions. The solution path is highlighted. Raising openness never leaves **isolated pillars** floating in the open chambers — a grid-vertex post is kept only when at least one wall still touches it, so wall continuity is preserved while freestanding stubs disappear (cleaner to print, no stray obstacles).
 
 Optionally enable **TA solution** to make the maze's *unique* solution a turn-alternating (R, L, R, L …) staircase: the whole plate is one continuous maze with uniform walls, but only an animal that keeps alternating its turns can reach the exit. Every turn is a real **T-junction** — straight ahead is walled, both left and right are open, one continues the solution (the alternating direction) and the other is a dead-end branch — so a non-alternating animal always hits a dead end. (The very first turn is a forced reference turn.) (This is the "fill the entire plate with one continuous maze" form of the turn-alternation experiment; openness and entrance/exit position are overridden in this mode.) Each turn on the highlighted solution is labelled **L** (green) / **R** (pink) so you can read the alternation at a glance.
+
+The **number of alternations is adjustable** (the *Alternations / 交替ターン* control that appears when TA solution is on): leave it on **AUTO** for a sensible count scaled to the grid, or set the exact turn count by hand. The panel shows how many real decision T-junctions that gives (`forced 1 + decisions N−1`) and the maximum the current grid can fit; if you ask for more turns than fit, it clamps and tells you, and your requested value is restored when you enlarge the grid again.
 
 ### 2. Serial T-Maze (連続T字 / experimental)
 A staircase of numbered T-junctions purpose-built for turn-alternation (TA) experiments:

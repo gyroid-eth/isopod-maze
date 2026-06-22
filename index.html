@@ -111,6 +111,23 @@
     .toggle-row input[type=checkbox]:checked { background:rgba(255,200,0,0.18); border-color:rgba(255,200,0,0.5); }
     .toggle-row input[type=checkbox]:checked::after { left:15px; background:#ffc800; }
     .toggle-label { font-size:10px; color:var(--text); }
+    /* TA alternation サブパネル（amber 領域） */
+    .ta-panel { overflow:hidden; max-height:0; opacity:0; margin-top:0; transition:max-height .38s cubic-bezier(.4,0,.2,1), opacity .26s ease, margin-top .38s cubic-bezier(.4,0,.2,1); }
+    .ta-panel.open { max-height:190px; opacity:1; margin-top:11px; }
+    .ta-inner { padding:11px 12px; background:rgba(255,200,0,0.05); border:1px solid rgba(255,200,0,0.22); border-left:2px solid #ffc800; border-radius:2px; }
+    .ta-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+    .ta-title { font-family:'Orbitron',monospace; font-size:8px; font-weight:600; letter-spacing:0.34em; color:#ffc800; text-transform:uppercase; }
+    .chip { font-size:8px; letter-spacing:0.14em; padding:2px 8px; border-radius:10px; border:1px solid rgba(255,200,0,0.45); color:#ffc800; background:rgba(255,200,0,0.1); cursor:pointer; user-select:none; transition:all .15s; }
+    .chip:hover { background:rgba(255,200,0,0.2); box-shadow:0 0 10px rgba(255,200,0,0.18); }
+    .chip.off { color:var(--text-dim); border-color:var(--border); background:transparent; box-shadow:none; }
+    .slider-amber { background:rgba(255,200,0,0.14); }
+    .slider-amber:hover { background:rgba(255,200,0,0.24); }
+    .slider-amber::-webkit-slider-thumb { background:#ffc800; box-shadow:0 0 10px rgba(255,200,0,0.4); }
+    .slider-amber:disabled { opacity:0.38; cursor:not-allowed; }
+    .slider-amber:disabled:hover { background:rgba(255,200,0,0.14); }
+    .ta-readout { margin-top:9px; font-size:8.5px; line-height:1.6; color:var(--text-dim); letter-spacing:0.03em; }
+    .ta-readout b { color:#ffc800; font-weight:500; }
+    .ta-readout .clamp { color:var(--amber); display:inline-block; margin-top:3px; }
     .mode-switch { display:flex; gap:4px; background:rgba(0,0,0,0.25); border:1px solid var(--border); border-radius:3px; padding:3px; }
     .mode-btn { flex:1; padding:7px 4px; font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:0.08em; color:var(--text-dim); background:transparent; border:none; border-radius:2px; cursor:pointer; transition:all 0.15s; }
     .mode-btn:hover { color:var(--text); }
@@ -176,6 +193,20 @@
         <input type="checkbox" id="p-ta">
         <span class="toggle-label">TA解 (交替性転向でしか解けない)</span>
       </label>
+      <div class="ta-panel" id="ta-panel">
+        <div class="ta-inner">
+          <div class="ta-head">
+            <span class="ta-title">Alternations · 交替ターン</span>
+            <span class="chip" id="ta-auto-chip">AUTO</span>
+          </div>
+          <div class="param-header" style="margin-bottom:6px">
+            <span class="param-label">ターン数</span>
+            <span class="param-value" id="v-altturns" style="color:#ffc800">—</span>
+          </div>
+          <input type="range" id="p-altturns" class="slider-amber" min="2" max="96" value="8" step="2">
+          <div class="ta-readout" id="ta-readout">—</div>
+        </div>
+      </div>
     </div>
 
     <div class="section mode-maze">
@@ -392,21 +423,29 @@ function generateMaze(rows, cols, opennessPct, rng) {
 // ── TA maze: 唯一解が「交替ターンの階段」になる perfect maze ──
 // 解を先に彫り(S,E,S,E… の階段=厳密な左右交互)、残りを枝として生やす（閉路なし=唯一解）。
 // vstep/hstep を縦横比で調整するので任意の rows×cols に収まる。
-function generateTAMaze(rows, cols, rng) {
+function generateTAMaze(rows, cols, rng, opt) {
   const walls = Array.from({length:rows}, () => Array.from({length:cols}, () => ({N:true,S:true,E:true,W:true})));
   const visited = Array.from({length:rows}, () => new Array(cols).fill(false));
-  let k = Math.max(2, Math.min(6, Math.floor(Math.min(rows,cols)/2)));
-  let vstep = Math.floor((rows-1)/k), hstep = Math.floor((cols-1)/k);
-  while ((vstep<1 || hstep<1) && k>1) { k--; vstep=Math.floor((rows-1)/k); hstep=Math.floor((cols-1)/k); }
-  vstep=Math.max(1,vstep); hstep=Math.max(1,hstep);
+  // 階段解: down×(k+1) と right×k を交互に彫る ⇒ 解のターン数 = 2k（厳密）。
+  // 制約: down-run 各≥1 ⇒ k≤rows-2 ／ right-run 各≥1 ⇒ k≤cols-1。
+  const kMax = Math.max(1, Math.min(rows-2, cols-1));
+  const autoK = Math.min(kMax, Math.max(2, Math.min(6, Math.floor(Math.min(rows,cols)/2))));
+  let k = autoK;
+  if (opt && opt.turns != null) k = Math.max(1, Math.min(kMax, Math.round(opt.turns/2)));
+  const distribute = (total, parts) => {            // total を parts 個に各≥1 で分配
+    const base = Math.floor(total/parts), rem = total - base*parts;
+    return Array.from({length:parts}, (_,i)=> base + (i<rem?1:0));
+  };
+  const downs  = distribute(rows-1, k+1);
+  const rights = distribute(cols-1, k);
   let r=0, c=0; visited[0][0]=true; const sol=[[0,0]];
   function carve(nr,nc,f,t){ walls[r][c][f]=false; walls[nr][nc][t]=false; r=nr; c=nc; visited[r][c]=true; sol.push([r,c]); }
   for (let i=0;i<k;i++) {
-    for (let s=0;s<vstep && r<rows-1;s++) carve(r+1,c,'S','N');   // descend
-    for (let s=0;s<hstep && c<cols-1;s++) carve(r,c+1,'E','W');   // step right
+    for (let s=0;s<downs[i];s++)  carve(r+1,c,'S','N');   // descend
+    for (let s=0;s<rights[i];s++) carve(r,c+1,'E','W');   // step right
   }
-  while (r<rows-1) carve(r+1,c,'S','N');                          // straight tail to bottom
-  const entranceCol=0, exitCol=c;
+  for (let s=0;s<downs[k];s++) carve(r+1,c,'S','N');      // last descent → bottom
+  const entranceCol=0, exitCol=c, turns=2*k, turnsMax=2*kMax;
   const DIRS=[{dr:-1,dc:0,f:'N',t:'S'},{dr:1,dc:0,f:'S',t:'N'},{dr:0,dc:-1,f:'W',t:'E'},{dr:0,dc:1,f:'E',t:'W'}];
   // growing-tree（sol の壁は一切触らない＝直進ブロック・直線部封印を保つ）
   function growFrom(seed) {
@@ -442,7 +481,7 @@ function generateTAMaze(rows, cols, rng) {
   for (let r=0;r<rows;r++) for (let c=0;c<cols;c++) {
     if (!visited[r][c]) { visited[r][c]=true; growFrom([[r,c]]); }
   }
-  return { walls, entranceCol, exitCol, sol };
+  return { walls, entranceCol, exitCol, sol, turns, turnsMax };
 }
 
 // ── BFS Solver ──
@@ -642,7 +681,8 @@ function heightfieldTris(open, wall, res, floorT, wallH, z0) {
 }
 
 let state = { seed: 0, maze: null, path: [], currentView: '2d',
-              mode: 'maze', stModel: null, stBoxes: [], stStubStyle: 'deadend' };
+              mode: 'maze', stModel: null, stBoxes: [], stStubStyle: 'deadend',
+              taAuto: true, taTurns: null, taTurnsActual: 8 };
 
 function buildSerialT() {
   const p = getSTParams();
@@ -806,6 +846,24 @@ function updateDerivedCell(p) {
   }
 }
 
+// TA交替ターンUIを生成結果と同期（実際のターン数・最大・クランプ通知）
+function syncTAUI(ta, reqTurns, auto, rows, cols){
+  const slider=document.getElementById('p-altturns');
+  const valEl=document.getElementById('v-altturns');
+  const chip=document.getElementById('ta-auto-chip');
+  const readout=document.getElementById('ta-readout');
+  state.taTurnsActual = ta.turns;
+  slider.max=ta.turnsMax;
+  // thumb: 手動なら希望値（max超は browser が max 表示にクランプ）、AUTO は実値
+  slider.value = (!auto && reqTurns!=null) ? reqTurns : ta.turns;
+  chip.classList.toggle('off', !auto);   // AUTO中もスライダは掴める（掴んだ瞬間マニュアルへ）
+  valEl.innerHTML = `${ta.turns}<span class="unit">回</span>` + (auto?` <span class="unit">AUTO</span>`:``);
+  let html = `T字分岐 <b>${ta.turns}</b>（強制 1 ＋ 判断 ${Math.max(0,ta.turns-1)}）　·　最大 <b>${ta.turnsMax}</b>`;
+  if (!auto && reqTurns!=null && reqTurns!==ta.turns)
+    html += `<br><span class="clamp">▲ ${reqTurns} 回は ${rows}×${cols} に収まらず ${ta.turns} 回へ調整</span>`;
+  readout.innerHTML = html;
+}
+
 function buildMaze(newSeed) {
   if (state.mode === 'serialT') { buildSerialT(); return; }
   if (newSeed !== undefined) state.seed = newSeed;
@@ -814,8 +872,11 @@ function buildMaze(newSeed) {
   const rng = makePRNG(state.seed);
   let walls, entranceCol, exitCol;
   if (p.ta) {
-    const ta = generateTAMaze(p.rows, p.cols, rng);
+    const auto = state.taAuto !== false;
+    const reqTurns = auto ? null : state.taTurns;   // 希望値（グリッド変更を跨いで保持）
+    const ta = generateTAMaze(p.rows, p.cols, rng, {turns: reqTurns});
     walls = ta.walls; entranceCol = ta.entranceCol; exitCol = ta.exitCol;
+    syncTAUI(ta, reqTurns, auto, p.rows, p.cols);
   } else {
     walls = generateMaze(p.rows, p.cols, p.openness, rng);
     entranceCol = resolveOpeningCol(document.getElementById('p-entrance').value, p.cols);
@@ -1269,7 +1330,19 @@ document.querySelectorAll('.mode-btn').forEach(b=>{
 ['p-entrance','p-exit'].forEach(id=>{
   document.getElementById(id).addEventListener('change',()=>buildMaze());
 });
-document.getElementById('p-ta').addEventListener('change',()=>buildMaze());
+document.getElementById('p-ta').addEventListener('change',(e)=>{
+  document.getElementById('ta-panel').classList.toggle('open', e.target.checked);
+  buildMaze();
+});
+document.getElementById('ta-auto-chip').addEventListener('click',()=>{
+  state.taAuto=!state.taAuto;
+  if(!state.taAuto && state.taTurns==null) state.taTurns=state.taTurnsActual; // 手動切替時は現在値を引き継ぐ
+  buildMaze();
+});
+document.getElementById('p-altturns').addEventListener('input',()=>{
+  state.taAuto=false; state.taTurns=parseInt(document.getElementById('p-altturns').value);
+  buildMaze();
+});
 document.getElementById('p-path').addEventListener('change',()=>{
   if (state.currentView==='2d') redraw2D(); else rebuild3D();
 });
