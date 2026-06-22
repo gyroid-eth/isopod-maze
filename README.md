@@ -10,6 +10,9 @@ A single-file, browser-based **parametric maze generator for 3D-printable isopod
 ### Random maze mode
 ![Random maze mode](screenshots/random-maze.png)
 
+### 3D preview
+![3D preview](screenshots/3d-preview.png)
+
 ## Why
 
 Isopods exhibit **alternating turning** (交替性転向): after turning right they tend to turn left next, then right again. It's a classic, accessible behavior experiment — popular in school science projects and studied in the literature. This tool lets you design the apparatus precisely (corridor width, turn spacing, number of junctions) and print a clean, reusable maze instead of taping plastic strips onto a board.
