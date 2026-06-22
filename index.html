@@ -161,11 +161,11 @@
       <div class="param-grid">
         <div class="param">
           <div class="param-header"><span class="param-label">Rows</span><span class="param-value" id="v-rows">10</span></div>
-          <input type="range" id="p-rows" min="4" max="24" value="10">
+          <input type="range" id="p-rows" min="4" max="50" value="10">
         </div>
         <div class="param">
           <div class="param-header"><span class="param-label">Cols</span><span class="param-value" id="v-cols">12</span></div>
-          <input type="range" id="p-cols" min="4" max="30" value="12">
+          <input type="range" id="p-cols" min="4" max="50" value="12">
         </div>
       </div>
       <div class="param" style="margin-top:10px">
@@ -329,6 +329,31 @@ function resolveOpeningCol(pos, cols) {
   if (pos === 'center') return Math.floor(cols / 2);
   const n = parseInt(pos, 10);
   return n < 0 ? cols + n : Math.max(0, Math.min(n, cols - 1));
+}
+
+// ── 支柱（grid 頂点の柱）の要否判定 ──
+// openness で内壁が抜けると、4辺すべての壁が消えた頂点に柱だけが浮く「孤立柱」が生じる。
+// 頂点(vr,vc)に隣接する4つの壁セグメントのうち1つでも在れば柱を出し、0なら出さない。
+// → 孤立柱だけを消す。壁が貫通/分岐/末端で接する頂点は必ず保持されるので壁の連続性は壊れない。
+// （TA/perfect maze では孤立柱は構造上発生しないので no-op。）
+function horizWallAt(maze, r, c){ // 水平壁セグメント r:0..rows, c:0..cols-1（頂点(r,c)-(r,c+1)間）
+  const {rows,walls,entranceCol,exitCol}=maze;
+  if(r===0)    return c!==entranceCol;
+  if(r===rows) return c!==exitCol;
+  return walls[r][c].N;
+}
+function vertWallAt(maze, r, c){ // 垂直壁セグメント r:0..rows-1, c:0..cols（頂点(r,c)-(r+1,c)間）
+  const {cols,walls}=maze;
+  if(c===0||c===cols) return true;
+  return walls[r][c].W;
+}
+function postNeeded(maze, vr, vc){ // 頂点(vr,vc) vr:0..rows, vc:0..cols に隣接壁があるか
+  const {rows,cols}=maze;
+  if(vr-1>=0    && vertWallAt(maze,vr-1,vc)) return true; // 上
+  if(vr<=rows-1 && vertWallAt(maze,vr,vc))   return true; // 下
+  if(vc-1>=0    && horizWallAt(maze,vr,vc-1))return true; // 左
+  if(vc<=cols-1 && horizWallAt(maze,vr,vc))  return true; // 右
+  return false;
 }
 
 function generateMaze(rows, cols, opennessPct, rng) {
@@ -813,7 +838,9 @@ function updateInfoBar(p) {
     if(hw)wc++;
   }
   for(let r=0;r<rows;r++) for(let c=0;c<=cols;c++) { if(c===0||c===cols||walls[r][c].W)wc++; }
-  const tris=((rows+1)*(cols+1)+wc+1)*12;
+  let posts=0;
+  for(let r=0;r<=rows;r++) for(let c=0;c<=cols;c++) if(postNeeded(state.maze,r,c)) posts++;
+  const tris=(posts+wc+1)*12;
   document.getElementById('i-grid').textContent  = `${p.cols} \xd7 ${p.rows}`;
   document.getElementById('i-size').textContent  = `${p.totalW} \xd7 ${p.totalH} mm`;
   document.getElementById('i-cell').textContent  = `${p.cellW.toFixed(1)} \xd7 ${p.cellH.toFixed(1)} mm`;
@@ -871,6 +898,7 @@ function redraw2D() {
   }
 
   for(let r=0;r<=rows;r++) for(let c=0;c<=cols;c++){
+    if(!postNeeded(state.maze,r,c)) continue; // 孤立柱は描かない
     ctx.fillStyle='#1a5580'; ctx.fillRect(mx(c*stepX),my(r*stepY),ms(wallT),ms(wallT));
     ctx.strokeStyle='rgba(0,200,255,0.7)'; ctx.lineWidth=0.8;
     ctx.strokeRect(mx(c*stepX)+0.5,my(r*stepY)+0.5,ms(wallT)-1,ms(wallT)-1);
@@ -1060,7 +1088,7 @@ function rebuild3D() {
   }
 
   addBox(0,0,-floorT,totalW,totalD,floorT,floorMat);
-  for(let r=0;r<=rows;r++) for(let c=0;c<=cols;c++) addBox(c*stepX,r*stepY,0,wallT,wallT,wallH,wallMat);
+  for(let r=0;r<=rows;r++) for(let c=0;c<=cols;c++) if(postNeeded(state.maze,r,c)) addBox(c*stepX,r*stepY,0,wallT,wallT,wallH,wallMat); // 孤立柱は出さない
   for(let r=0;r<=rows;r++) for(let c=0;c<cols;c++){
     let hw;
     if(r===0)hw=c!==entranceCol;
@@ -1138,7 +1166,7 @@ function rasterizeMaze(maze, p, res){
     for(let r=r0;r<=r1;r++)for(let c=c0;c<=c1;c++){const px=c*res+res/2,py=r*res+res/2;
       if(px>=x0&&px<=x1&&py>=y0&&py<=y1) wall[r][c]=true;}
   }
-  for(let r=0;r<=rows;r++) for(let c=0;c<=cols;c++) fillWall(c*stepX,r*stepY,c*stepX+wallT,r*stepY+wallT); // 支柱
+  for(let r=0;r<=rows;r++) for(let c=0;c<=cols;c++) if(postNeeded(maze,r,c)) fillWall(c*stepX,r*stepY,c*stepX+wallT,r*stepY+wallT); // 支柱（孤立柱は出さない）
   for(let r=0;r<=rows;r++) for(let c=0;c<cols;c++){
     let hw;if(r===0)hw=c!==entranceCol;else if(r===rows)hw=c!==exitCol;else hw=walls[r][c].N;
     if(hw)fillWall(c*stepX+wallT,r*stepY,c*stepX+wallT+cellW,r*stepY+wallT);
