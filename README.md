@@ -4,6 +4,12 @@ A single-file, browser-based **parametric maze generator for 3D-printable isopod
 
 > ダンゴムシ（オカダンゴムシ等）の**交替性転向（alternating turning）**を観察・実験するための迷路を、パラメトリックに設計して 3D プリントできる単一ファイルの Web アプリです。
 
+### Serial T-maze mode (連続T字 / experimental)
+![Serial T-maze mode](screenshots/serial-t-maze.png)
+
+### Random maze mode
+![Random maze mode](screenshots/random-maze.png)
+
 ## Why
 
 Isopods exhibit **alternating turning** (交替性転向): after turning right they tend to turn left next, then right again. It's a classic, accessible behavior experiment — popular in school science projects and studied in the literature. This tool lets you design the apparatus precisely (corridor width, turn spacing, number of junctions) and print a clean, reusable maze instead of taping plastic strips onto a board.
