@@ -4,7 +4,7 @@ A single-file, browser-based **parametric maze generator for 3D-printable isopod
 
 **▶ Live demo: https://gyroid-eth.github.io/isopod-maze/**
 
-> ダンゴムシ（オカダンゴムシ等）の**交替性転向（alternating turning）**を観察・実験するための迷路を、パラメトリックに設計して 3D プリントできる単一ファイルの Web アプリです。
+> ダンゴムシ（オカダンゴムシ等）の**交替性転向（turn alternation, TA）**を観察・実験するための迷路を、パラメトリックに設計して 3D プリントできる単一ファイルの Web アプリです。
 
 ### Serial T-maze mode (連続T字 / experimental)
 ![Serial T-maze mode](screenshots/serial-t-maze.png)
@@ -17,7 +17,7 @@ A single-file, browser-based **parametric maze generator for 3D-printable isopod
 
 ## Why
 
-Isopods exhibit **alternating turning** (交替性転向): after turning right they tend to turn left next, then right again. It's a classic, accessible behavior experiment — popular in school science projects and studied in the literature. This tool lets you design the apparatus precisely (corridor width, turn spacing, number of junctions) and print a clean, reusable maze instead of taping plastic strips onto a board.
+Isopods exhibit **turn alternation** (TA / 交替性転向): after turning right they tend to turn left next, then right again. It's a classic, accessible behavior experiment — popular in school science projects and studied in the literature. This tool lets you design the apparatus precisely (corridor width, turn spacing, number of junctions) and print a clean, reusable maze instead of taping plastic strips onto a board.
 
 ## Two modes
 
@@ -25,7 +25,7 @@ Isopods exhibit **alternating turning** (交替性転向): after turning right t
 A classic square-grid maze (DFS recursive backtracker) with adjustable density ("openness" adds loops). Fully parametric overall size, wall height/thickness, floor thickness, and entrance/exit positions. The solution path is highlighted.
 
 ### 2. Serial T-Maze (連続T字 / experimental)
-A staircase of numbered T-junctions purpose-built for alternating-turning experiments:
+A staircase of numbered T-junctions purpose-built for turn-alternation (TA) experiments:
 
 - The **through-path forces alternating 90° turns** — only an animal that keeps alternating reaches the goal.
 - Each junction is a binary left/right choice; junctions are **numbered** so you can record the L/R sequence per trial.
@@ -65,7 +65,7 @@ python3 -m http.server 9876 --bind 0.0.0.0
 
 ## Background & references
 
-Alternating turning (交替性転向 / thigmotaxis-related turn alternation) in *Armadillidium vulgare* and other isopods:
+Turn alternation (TA; 交替性転向, also "turn alternation reaction / TAR") in *Armadillidium vulgare* and other isopods:
 
 - "オカダンゴムシの交替性転向の仕組みを探る", *Kagaku to Seibutsu* 53(2): 130–132 (2015). https://katosei.jsbba.or.jp/view_html.php?aid=336
 - "ダンゴムシの迷路実験をやってみた" (note.com) — a practical write-up showing how corridor width must fit the animal. https://note.com/yamakei90_/n/nb00d78dde9c3
