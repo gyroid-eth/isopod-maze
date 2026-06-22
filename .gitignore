@@ -2,4 +2,3 @@
 *.stl
 *.obj
 node_modules/
-publish.sh
