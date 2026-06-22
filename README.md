@@ -35,6 +35,7 @@ A staircase of numbered T-junctions purpose-built for turn-alternation (TA) expe
 - **Corridor width** is exposed prominently — it must match the body width of your specimens (pill bugs are ~4–7 mm wide); a mismatched corridor breaks the behavior.
 - **Escapable exits**: the GOAL and the *first* junction's "wrong" branch are open exits (the first turn is a free reference turn, so both directions are valid). Every later wrong turn ends in a closed **dead-end trap** (marked ✕), so reaching the goal means the animal alternated correctly at every junction.
 - The first turn (right / left) is selectable, mirroring the whole maze.
+- Optional **decorative maze fill**: fills the empty background with a maze so the plate is a full rectangle. The solution structure stays walled-off and fully functional — it's purely cosmetic (the animal placed at START can never reach the background maze).
 
 ## Usage
 
