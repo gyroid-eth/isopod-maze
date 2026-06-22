@@ -4,6 +4,8 @@ A single-file, browser-based **parametric maze generator for 3D-printable isopod
 
 **▶ Live demo: https://gyroid-eth.github.io/isopod-maze/**
 
+![Demo — a 3D-printed isopod maze in use](screenshots/demo.gif)
+
 > ダンゴムシ（オカダンゴムシ等）の**交替性転向（turn alternation, TA）**を観察・実験するための迷路を、パラメトリックに設計して 3D プリントできる単一ファイルの Web アプリです。
 
 ### Serial T-maze mode (連続T字 / experimental)
