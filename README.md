@@ -2,6 +2,8 @@
 
 A single-file, browser-based **parametric maze generator for 3D-printable isopod (pill bug / ダンゴムシ) mazes**. Design a maze with sliders, preview it in 2D and 3D, and export a watertight STL ready for printing. No build step, no dependencies to install — just open `index.html`.
 
+**▶ Live demo: https://gyroid-eth.github.io/isopod-maze/**
+
 > ダンゴムシ（オカダンゴムシ等）の**交替性転向（alternating turning）**を観察・実験するための迷路を、パラメトリックに設計して 3D プリントできる単一ファイルの Web アプリです。
 
 ### Serial T-maze mode (連続T字 / experimental)
