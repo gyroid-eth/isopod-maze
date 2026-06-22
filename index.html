@@ -1,0 +1,1199 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ISOPOD MAZE ARCHITECT</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;900&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <style>
+    :root {
+      --bg: #060c1a;
+      --panel: rgba(6, 15, 38, 0.97);
+      --border: rgba(0, 200, 255, 0.18);
+      --accent: #00c8ff;
+      --accent-glow: rgba(0, 200, 255, 0.35);
+      --amber: #ff9d00;
+      --green: #00ff88;
+      --red: #ff4466;
+      --text: #7ea8c0;
+      --text-bright: #d8eef8;
+      --text-dim: rgba(126, 168, 192, 0.5);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'JetBrains Mono', monospace;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      background-image:
+        radial-gradient(ellipse 80% 60% at 50% -10%, rgba(0,80,140,0.18) 0%, transparent 70%),
+        linear-gradient(rgba(0,200,255,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,200,255,0.025) 1px, transparent 1px);
+      background-size: 100% 100%, 48px 48px, 48px 48px;
+    }
+    header {
+      display: flex; align-items: center;
+      padding: 0 24px; height: 52px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(3, 8, 22, 0.98);
+      flex-shrink: 0; gap: 14px;
+    }
+    .logo-hex { width: 30px; height: 30px; flex-shrink: 0; }
+    .logo-hex svg { width: 100%; height: 100%; }
+    h1 { font-family: 'Orbitron', monospace; font-size: 13px; font-weight: 900; letter-spacing: 0.35em; color: var(--accent); text-shadow: 0 0 20px var(--accent-glow); }
+    .header-sub { font-size: 9px; letter-spacing: 0.25em; color: var(--text-dim); margin-top: 1px; }
+    .header-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+    .pill { font-size: 9px; padding: 3px 9px; border: 1px solid var(--border); border-radius: 20px; letter-spacing: 0.15em; color: var(--text-dim); }
+    .status-pill { display: flex; align-items: center; gap: 5px; font-size: 9px; padding: 3px 9px; border: 1px solid rgba(0,255,136,0.25); border-radius: 20px; color: var(--green); letter-spacing: 0.1em; }
+    .dot { width: 5px; height: 5px; background: var(--green); border-radius: 50%; animation: blink 2.5s ease-in-out infinite; }
+    @keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+    .main { display: flex; flex: 1; overflow: hidden; }
+    .controls { width: 300px; flex-shrink: 0; border-right: 1px solid var(--border); background: var(--panel); overflow-y: auto; display: flex; flex-direction: column; }
+    .controls::-webkit-scrollbar { width: 3px; }
+    .controls::-webkit-scrollbar-thumb { background: rgba(0,200,255,0.2); border-radius: 2px; }
+    .section { padding: 13px 15px; border-bottom: 1px solid var(--border); }
+    .section-title { font-family: 'Orbitron', monospace; font-size: 8px; font-weight: 600; letter-spacing: 0.45em; color: var(--accent); text-transform: uppercase; margin-bottom: 11px; display: flex; align-items: center; gap: 8px; }
+    .section-title::after { content:''; flex:1; height:1px; background: linear-gradient(to right, var(--border), transparent); }
+    .param { margin-bottom: 11px; }
+    .param:last-child { margin-bottom: 0; }
+    .param-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 5px; }
+    .param-label { font-size: 10px; color: var(--text); }
+    .param-value { font-size: 12px; font-weight: 500; color: var(--text-bright); font-variant-numeric: tabular-nums; }
+    .unit { font-size: 9px; color: var(--text-dim); margin-left: 1px; }
+    input[type=range] { width: 100%; height: 2px; -webkit-appearance: none; background: rgba(0,200,255,0.12); border-radius: 1px; outline: none; cursor: pointer; }
+    input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; background: var(--accent); border-radius: 2px; cursor: pointer; box-shadow: 0 0 10px var(--accent-glow); transition: transform 0.1s; }
+    input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.3); }
+    input[type=range]:hover { background: rgba(0,200,255,0.22); }
+    .param-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .cell-derived { margin-top: 7px; display: flex; align-items: center; gap: 6px; padding: 5px 8px; background: rgba(0,200,255,0.05); border: 1px solid var(--border); border-radius: 2px; }
+    .cell-derived-label { font-size: 9px; color: var(--text-dim); letter-spacing: 0.1em; }
+    .cell-derived-val { font-size: 11px; color: var(--accent); font-weight: 500; }
+    .cell-warn { color: var(--red) !important; }
+    select { background: rgba(0,200,255,0.04); border: 1px solid var(--border); color: var(--text-bright); font-family: 'JetBrains Mono', monospace; font-size: 10px; padding: 5px 8px; border-radius: 2px; width: 100%; cursor: pointer; outline: none; }
+    select:focus { border-color: var(--accent); }
+    .opening-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .opening-item { display: flex; flex-direction: column; gap: 4px; }
+    .opening-label { font-size: 9px; color: var(--text-dim); letter-spacing: 0.15em; }
+    .btn-section { padding: 12px 15px; display: flex; flex-direction: column; gap: 6px; }
+    .btn { width: 100%; padding: 9px 16px; font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; cursor: pointer; border-radius: 2px; transition: all 0.15s; display: flex; align-items: center; justify-content: center; gap: 7px; }
+    .btn-primary { background: var(--accent); color: #000d1a; border: none; font-weight: 500; }
+    .btn-primary:hover { background: #33d8ff; box-shadow: 0 0 24px rgba(0,200,255,0.4); }
+    .btn-primary:active { transform: scale(0.98); }
+    .btn-ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
+    .btn-ghost:hover { border-color: rgba(0,200,255,0.4); color: var(--accent); }
+    .btn-export { background: rgba(255,157,0,0.08); color: var(--amber); border: 1px solid rgba(255,157,0,0.22); }
+    .btn-export:hover { background: rgba(255,157,0,0.18); border-color: var(--amber); box-shadow: 0 0 14px rgba(255,157,0,0.18); }
+    .seed-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 10px; background: rgba(0,0,0,0.25); border: 1px solid var(--border); border-radius: 2px; margin-top: 8px; }
+    .seed-label { font-size: 9px; color: var(--text-dim); letter-spacing: 0.2em; }
+    .seed-val { font-size: 11px; color: var(--accent); font-weight: 500; }
+    .preview { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    .view-tabs { display: flex; border-bottom: 1px solid var(--border); background: rgba(3,8,22,0.6); flex-shrink: 0; }
+    .tab { padding: 10px 20px; font-size: 9px; letter-spacing: 0.25em; text-transform: uppercase; cursor: pointer; color: var(--text-dim); border-bottom: 2px solid transparent; transition: all 0.15s; user-select: none; }
+    .tab:hover { color: var(--text); }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .canvas-area { flex: 1; position: relative; overflow: hidden; }
+    .corner { position: absolute; width: 18px; height: 18px; pointer-events: none; z-index: 2; }
+    .corner-tl { top:10px; left:10px; border-top:2px solid var(--accent); border-left:2px solid var(--accent); }
+    .corner-tr { top:10px; right:10px; border-top:2px solid var(--accent); border-right:2px solid var(--accent); }
+    .corner-bl { bottom:10px; left:10px; border-bottom:2px solid var(--accent); border-left:2px solid var(--accent); }
+    .corner-br { bottom:10px; right:10px; border-bottom:2px solid var(--accent); border-right:2px solid var(--accent); }
+    #canvas2d { position: absolute; top:0; left:0; width:100%; height:100%; display:block; }
+    #canvas3d { position: absolute; top:0; left:0; display:none; }
+    .hint-3d { position: absolute; bottom:12px; left:50%; transform:translateX(-50%); font-size:9px; color:rgba(0,200,255,0.35); letter-spacing:0.12em; pointer-events:none; display:none; white-space:nowrap; }
+    .toggle-row { display:flex; align-items:center; gap:9px; cursor:pointer; user-select:none; }
+    .toggle-row input[type=checkbox] { appearance:none; -webkit-appearance:none; width:28px; height:14px; background:rgba(0,200,255,0.1); border:1px solid var(--border); border-radius:7px; cursor:pointer; position:relative; transition:background 0.2s; flex-shrink:0; }
+    .toggle-row input[type=checkbox]::after { content:''; position:absolute; width:10px; height:10px; border-radius:50%; background:var(--text-dim); top:1px; left:1px; transition:left 0.2s,background 0.2s; }
+    .toggle-row input[type=checkbox]:checked { background:rgba(255,200,0,0.18); border-color:rgba(255,200,0,0.5); }
+    .toggle-row input[type=checkbox]:checked::after { left:15px; background:#ffc800; }
+    .toggle-label { font-size:10px; color:var(--text); }
+    .mode-switch { display:flex; gap:4px; background:rgba(0,0,0,0.25); border:1px solid var(--border); border-radius:3px; padding:3px; }
+    .mode-btn { flex:1; padding:7px 4px; font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:0.08em; color:var(--text-dim); background:transparent; border:none; border-radius:2px; cursor:pointer; transition:all 0.15s; }
+    .mode-btn:hover { color:var(--text); }
+    .mode-btn.active { background:var(--accent); color:#000d1a; font-weight:500; box-shadow:0 0 14px rgba(0,200,255,0.3); }
+    .mode-note { font-size:8.5px; line-height:1.5; color:var(--text-dim); margin-top:8px; }
+    .plate-warn { color:var(--red) !important; }
+    .info-bar { display: flex; align-items: center; flex-shrink: 0; border-top: 1px solid var(--border); background: rgba(3,8,22,0.85); height: 38px; }
+    .info-item { display: flex; align-items: center; gap: 8px; padding: 0 18px; border-right: 1px solid var(--border); height: 100%; }
+    .info-item:last-child { border-right: none; margin-left: auto; }
+    .info-lbl { font-size: 8px; letter-spacing: 0.2em; color: var(--text-dim); text-transform: uppercase; }
+    .info-val { font-size: 11px; color: var(--text-bright); font-weight: 500; font-variant-numeric: tabular-nums; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo-hex">
+    <svg viewBox="0 0 30 30" fill="none">
+      <polygon points="15,2 27,9 27,21 15,28 3,21 3,9" stroke="#00c8ff" stroke-width="1.5" fill="none" opacity="0.7"/>
+      <circle cx="15" cy="15" r="4" fill="#00c8ff" opacity="0.9"/>
+      <circle cx="15" cy="15" r="7" stroke="#00c8ff" stroke-width="0.5" fill="none" opacity="0.4" stroke-dasharray="2 3"/>
+    </svg>
+  </div>
+  <div>
+    <h1>Isopod Maze Architect</h1>
+    <div class="header-sub">3D PRINTABLE PARAMETRIC MAZE GENERATOR</div>
+  </div>
+  <div class="header-right">
+    <div class="pill">v1.3</div>
+    <div class="status-pill"><div class="dot"></div>READY</div>
+  </div>
+</header>
+
+<div class="main">
+  <div class="controls">
+
+    <div class="section">
+      <div class="section-title">Mode</div>
+      <div class="mode-switch">
+        <button class="mode-btn active" data-mode="maze">Random Maze</button>
+        <button class="mode-btn" data-mode="serialT">連続T字 (実験用)</button>
+      </div>
+      <div class="mode-note" id="mode-note"></div>
+    </div>
+
+    <div class="section mode-maze">
+      <div class="section-title">Grid</div>
+      <div class="param-grid">
+        <div class="param">
+          <div class="param-header"><span class="param-label">Rows</span><span class="param-value" id="v-rows">10</span></div>
+          <input type="range" id="p-rows" min="4" max="24" value="10">
+        </div>
+        <div class="param">
+          <div class="param-header"><span class="param-label">Cols</span><span class="param-value" id="v-cols">12</span></div>
+          <input type="range" id="p-cols" min="4" max="30" value="12">
+        </div>
+      </div>
+      <div class="param" style="margin-top:10px">
+        <div class="param-header"><span class="param-label">Openness</span><span class="param-value" id="v-openness">20<span class="unit">%</span></span></div>
+        <input type="range" id="p-openness" min="0" max="80" value="20" step="5">
+      </div>
+    </div>
+
+    <div class="section mode-maze">
+      <div class="section-title">Total Size</div>
+      <div class="param">
+        <div class="param-header"><span class="param-label">Width</span><span class="param-value" id="v-totalW">260<span class="unit">mm</span></span></div>
+        <input type="range" id="p-totalW" min="50" max="600" value="260" step="5">
+      </div>
+      <div class="param">
+        <div class="param-header"><span class="param-label">Height</span><span class="param-value" id="v-totalH">220<span class="unit">mm</span></span></div>
+        <input type="range" id="p-totalH" min="50" max="600" value="220" step="5">
+      </div>
+      <div class="cell-derived">
+        <span class="cell-derived-label">CELL SIZE</span>
+        <span class="cell-derived-val" id="derived-cell">—</span>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Walls &amp; Floor</div>
+      <div class="param">
+        <div class="param-header"><span class="param-label">Wall Height</span><span class="param-value" id="v-height">12<span class="unit">mm</span></span></div>
+        <input type="range" id="p-height" min="4" max="40" value="12" step="1">
+      </div>
+      <div class="param">
+        <div class="param-header"><span class="param-label">Wall Thickness</span><span class="param-value" id="v-thick">2<span class="unit">mm</span></span></div>
+        <input type="range" id="p-thick" min="1" max="10" value="2" step="0.5">
+      </div>
+      <div class="param">
+        <div class="param-header"><span class="param-label">Floor Thickness</span><span class="param-value" id="v-floor">2<span class="unit">mm</span></span></div>
+        <input type="range" id="p-floor" min="1" max="8" value="2" step="0.5">
+      </div>
+    </div>
+
+    <div class="section mode-maze">
+      <div class="section-title">Openings</div>
+      <div class="opening-row">
+        <div class="opening-item">
+          <div class="opening-label">ENTRANCE (N)</div>
+          <select id="p-entrance"><option value="0">Left</option><option value="center" selected>Center</option><option value="-1">Right</option></select>
+        </div>
+        <div class="opening-item">
+          <div class="opening-label">EXIT (S)</div>
+          <select id="p-exit"><option value="0">Left</option><option value="center" selected>Center</option><option value="-1">Right</option></select>
+        </div>
+      </div>
+    </div>
+
+    <div class="section mode-serialT" style="display:none">
+      <div class="section-title">T-Maze Params</div>
+      <div class="param">
+        <div class="param-header"><span class="param-label">Junctions (分岐数)</span><span class="param-value" id="v-njunc">10</span></div>
+        <input type="range" id="p-njunc" min="1" max="12" value="10" step="1">
+      </div>
+      <div class="param">
+        <div class="param-header"><span class="param-label">FC間距離 (分岐間)</span><span class="param-value" id="v-seg">50<span class="unit">mm</span></span></div>
+        <input type="range" id="p-seg" min="20" max="360" value="50" step="5">
+      </div>
+      <div class="param">
+        <div class="param-header"><span class="param-label">通路幅 (体格に合わせる)</span><span class="param-value" id="v-corr">10<span class="unit">mm</span></span></div>
+        <input type="range" id="p-corr" min="5" max="30" value="10" step="1">
+      </div>
+      <div class="param">
+        <div class="param-header"><span class="param-label">罠の長さ (J2以降)</span><span class="param-value" id="v-stub">25<span class="unit">mm</span></span></div>
+        <input type="range" id="p-stub" min="10" max="80" value="25" step="5">
+      </div>
+      <div class="opening-item" style="margin-top:4px">
+        <div class="opening-label">最初の分岐 (J1)</div>
+        <select id="p-firstturn"><option value="right" selected>右折 (Right)</option><option value="left">左折 (Left)</option></select>
+      </div>
+      <div class="cell-derived" style="margin-top:11px">
+        <span class="cell-derived-label">PLATE</span>
+        <span class="cell-derived-val" id="derived-plate">—</span>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Path</div>
+      <label class="toggle-row">
+        <input type="checkbox" id="p-path" checked>
+        <span class="toggle-label">Show solution path</span>
+      </label>
+    </div>
+
+    <div class="btn-section">
+      <button class="btn btn-primary" id="btn-generate">⟳&nbsp; Generate New Maze</button>
+      <button class="btn btn-ghost" id="btn-regen">↺&nbsp; Regenerate Same Seed</button>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Export</div>
+      <button class="btn btn-export" id="btn-stl" style="width:100%">↓ Export STL</button>
+      <div class="seed-row">
+        <span class="seed-label">SEED</span>
+        <span class="seed-val" id="seed-display">—</span>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="preview">
+    <div class="view-tabs">
+      <div class="tab active" data-view="2d">2D Blueprint</div>
+      <div class="tab" data-view="3d">3D Preview</div>
+    </div>
+    <div class="canvas-area" id="canvas-area">
+      <div class="corner corner-tl"></div><div class="corner corner-tr"></div>
+      <div class="corner corner-bl"></div><div class="corner corner-br"></div>
+      <canvas id="canvas2d"></canvas>
+      <canvas id="canvas3d"></canvas>
+      <div class="hint-3d" id="hint-3d">drag to rotate · scroll to zoom · right-drag to pan</div>
+    </div>
+    <div class="info-bar">
+      <div class="info-item"><span class="info-lbl">Grid</span><span class="info-val" id="i-grid">—</span></div>
+      <div class="info-item"><span class="info-lbl">Print Size</span><span class="info-val" id="i-size">—</span></div>
+      <div class="info-item"><span class="info-lbl">Cell</span><span class="info-val" id="i-cell">—</span></div>
+      <div class="info-item"><span class="info-lbl">Walls</span><span class="info-val" id="i-walls">—</span></div>
+      <div class="info-item"><span class="info-lbl">Triangles</span><span class="info-val" id="i-tris">—</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+function makePRNG(seed) {
+  return function() {
+    seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function getParams() {
+  const rows   = parseInt(document.getElementById('p-rows').value);
+  const cols   = parseInt(document.getElementById('p-cols').value);
+  const totalW = parseFloat(document.getElementById('p-totalW').value);
+  const totalH = parseFloat(document.getElementById('p-totalH').value);
+  const wallT  = parseFloat(document.getElementById('p-thick').value);
+  const wallH  = parseFloat(document.getElementById('p-height').value);
+  const floorT = parseFloat(document.getElementById('p-floor').value);
+  const openness = parseInt(document.getElementById('p-openness').value);
+  const cellW  = (totalW - (cols + 1) * wallT) / cols;
+  const cellH  = (totalH - (rows + 1) * wallT) / rows;
+  return { rows, cols, totalW, totalH, wallT, wallH, floorT, openness, cellW, cellH };
+}
+
+function resolveOpeningCol(pos, cols) {
+  if (pos === 'center') return Math.floor(cols / 2);
+  const n = parseInt(pos, 10);
+  return n < 0 ? cols + n : Math.max(0, Math.min(n, cols - 1));
+}
+
+function generateMaze(rows, cols, opennessPct, rng) {
+  const walls = Array.from({length: rows}, () =>
+    Array.from({length: cols}, () => ({N:true,S:true,E:true,W:true}))
+  );
+  const visited = Array.from({length: rows}, () => new Array(cols).fill(false));
+  const DIRS = [
+    {dr:-1,dc:0,from:'N',to:'S'},{dr:1,dc:0,from:'S',to:'N'},
+    {dr:0,dc:-1,from:'W',to:'E'},{dr:0,dc:1,from:'E',to:'W'},
+  ];
+  const stack = [[0,0]]; visited[0][0] = true;
+  while (stack.length) {
+    const [r,c] = stack[stack.length-1];
+    const nbrs = DIRS.map(d=>({nr:r+d.dr,nc:c+d.dc,d}))
+      .filter(({nr,nc})=>nr>=0&&nr<rows&&nc>=0&&nc<cols&&!visited[nr][nc]);
+    if (!nbrs.length) { stack.pop(); } else {
+      const {nr,nc,d} = nbrs[Math.floor(rng()*nbrs.length)];
+      walls[r][c][d.from]=false; walls[nr][nc][d.to]=false;
+      visited[nr][nc]=true; stack.push([nr,nc]);
+    }
+  }
+  if (opennessPct > 0) {
+    const maxRemove = Math.floor(rows*cols*(opennessPct/100)*0.5);
+    let removed=0, attempts=0;
+    while (removed<maxRemove && attempts<maxRemove*40) {
+      attempts++;
+      const r=Math.floor(rng()*rows), c=Math.floor(rng()*cols);
+      if (rng()<0.5) { if(r<rows-1&&walls[r][c].S){walls[r][c].S=false;walls[r+1][c].N=false;removed++;} }
+      else           { if(c<cols-1&&walls[r][c].E){walls[r][c].E=false;walls[r][c+1].W=false;removed++;} }
+    }
+  }
+  return walls;
+}
+
+// ── BFS Solver ──
+function solveMaze(maze) {
+  const {rows, cols, walls, entranceCol, exitCol} = maze;
+  const visited = Array.from({length: rows}, () => new Array(cols).fill(false));
+  const parent  = Array.from({length: rows}, () => new Array(cols).fill(null));
+  const queue = [[0, entranceCol]];
+  visited[0][entranceCol] = true;
+  const DIRS = [
+    {dr:-1,dc:0,w:'N'},{dr:1,dc:0,w:'S'},
+    {dr:0,dc:-1,w:'W'},{dr:0,dc:1,w:'E'}
+  ];
+  while (queue.length) {
+    const [r,c] = queue.shift();
+    if (r === rows-1 && c === exitCol) {
+      const path = [];
+      let cur = [r,c];
+      while (cur) { path.unshift(cur); cur = parent[cur[0]][cur[1]]; }
+      return path;
+    }
+    for (const {dr,dc,w} of DIRS) {
+      const nr=r+dr, nc=c+dc;
+      if (nr>=0&&nr<rows&&nc>=0&&nc<cols&&!visited[nr][nc]&&!walls[r][c][w]) {
+        visited[nr][nc]=true; parent[nr][nc]=[r,c]; queue.push([nr,nc]);
+      }
+    }
+  }
+  return [];
+}
+
+// ══════════════════════════════════════════════════════════
+//  SERIAL T-MAZE (連続T字迷路) — 交替性転向の実験用
+//  through 経路は S,E,S,E… と交互90°ターンを強制（=交替性転向を要求）。
+//  各分岐: 直進ブロック / 片側=through / 片側=dead-end stub。
+//  壁は通路の縁だけ(薄壁)。通路外は床板のみ。
+// ══════════════════════════════════════════════════════════
+const ST_DIR = { N:{dx:0,dy:-1}, S:{dx:0,dy:1}, E:{dx:1,dy:0}, W:{dx:-1,dy:0} };
+
+function getSTParams() {
+  return {
+    nJunc:     parseInt(document.getElementById('p-njunc').value),
+    segLen:    parseFloat(document.getElementById('p-seg').value),
+    corridorW: parseFloat(document.getElementById('p-corr').value),
+    stubLen:   parseFloat(document.getElementById('p-stub').value),
+    wallT:     parseFloat(document.getElementById('p-thick').value),
+    wallH:     parseFloat(document.getElementById('p-height').value),
+    floorT:    parseFloat(document.getElementById('p-floor').value),
+    firstTurn: document.getElementById('p-firstturn').value, // 'right' | 'left'
+  };
+}
+
+function generateSerialT(p) {
+  const cw = p.corridorW, seg = p.segLen, stub = p.stubLen, margin = cw;
+  // 南向き進入: 右折=西 / 左折=東（compass: S→W が右回り）
+  const lateral = (p.firstTurn === 'left') ? 'E' : 'W';
+  const oppLateral = (lateral === 'E') ? 'W' : 'E';
+  const segments = [], stubs = [], junctions = [], trapEnds = [];
+  let x = margin + cw/2, y = margin + cw/2, heading = 'S';
+  let nx = x + ST_DIR[heading].dx*seg, ny = y + ST_DIR[heading].dy*seg;
+  segments.push({x0:x,y0:y,x1:nx,y1:ny}); x=nx; y=ny;
+  for (let j=0; j<p.nJunc; j++) {
+    let tDir, sDir;
+    if (heading==='S') { tDir=lateral; sDir=oppLateral; } else { tDir='S'; sDir='N'; }
+    junctions.push({x, y, label:j+1, throughDir:tDir, stubDir:sDir});
+    if (j>0) { // J2以降の誤分岐＝閉じた行き止まり(罠)
+      const sx = x + ST_DIR[sDir].dx*stub, sy = y + ST_DIR[sDir].dy*stub;
+      stubs.push({x0:x,y0:y,x1:sx,y1:sy}); trapEnds.push({x:sx,y:sy});
+    }
+    nx = x + ST_DIR[tDir].dx*seg; ny = y + ST_DIR[tDir].dy*seg;
+    segments.push({x0:x,y0:y,x1:nx,y1:ny}); x=nx; y=ny; heading=tDir;
+  }
+  const exitHeading = heading;
+  const j1 = junctions[0];
+  let minX=1e9, minY=1e9, maxX=-1e9, maxY=-1e9;
+  for (const s of [...segments,...stubs]) {
+    minX=Math.min(minX,s.x0,s.x1); maxX=Math.max(maxX,s.x0,s.x1);
+    minY=Math.min(minY,s.y0,s.y1); maxY=Math.max(maxY,s.y0,s.y1);
+  }
+  const shiftX = Math.max(0, margin + cw/2 - minX), shiftY = Math.max(0, margin + cw/2 - minY);
+  if (shiftX || shiftY) {
+    const sh = o => { o.x0+=shiftX; o.y0+=shiftY; if(o.x1!==undefined){o.x1+=shiftX;o.y1+=shiftY;} };
+    segments.forEach(sh); stubs.forEach(sh);
+    junctions.forEach(jj=>{jj.x+=shiftX;jj.y+=shiftY;});
+    trapEnds.forEach(e=>{e.x+=shiftX;e.y+=shiftY;});
+    x+=shiftX; y+=shiftY; maxX+=shiftX; maxY+=shiftY;
+  }
+  const plateW = maxX + cw/2 + margin, plateH = maxY + cw/2 + margin;
+
+  // ── 脱出できる開口（プレート端まで延ばす＝端には壁キャップが付かない）──
+  // START: stem を上端まで延長（N開口）
+  segments[0].y0 = 0;
+  const entrance = {x: segments[0].x0, y: 0, dir:'N'};
+  // GOAL: 最終セグメントを exitHeading 方向の端まで延長
+  const last = segments[segments.length-1];
+  if (exitHeading==='S') last.y1 = plateH; else if (exitHeading==='N') last.y1 = 0;
+  else if (exitHeading==='E') last.x1 = plateW; else last.x1 = 0;
+  const goal = {x:last.x1, y:last.y1, dir:exitHeading};
+  // through 経路（START→GOAL）
+  const path = [];
+  for (const s of segments) { if (path.length===0) path.push([s.x0,s.y0]); path.push([s.x1,s.y1]); }
+  // J1 の誤った側（最初の分岐）: 端まで延ばして開口（脱出可）
+  const sd = j1.stubDir;
+  let ex, ey;
+  if (sd==='W'){ex=0;ey=j1.y;} else if (sd==='E'){ex=plateW;ey=j1.y;}
+  else if (sd==='N'){ex=j1.x;ey=0;} else {ex=j1.x;ey=plateH;}
+  segments.push({x0:j1.x, y0:j1.y, x1:ex, y1:ey}); // 開いた腕（through ではない）
+  const altExit = {x:ex, y:ey, dir:sd};
+
+  return { segments, stubs, junctions, trapEnds, altExit, cw, wallT:p.wallT, seg, stub,
+           plateW, plateH, path, firstTurn:p.firstTurn,
+           entrance, exit:goal };
+}
+
+function rasterizeST(model, res) {
+  const { segments, stubs, cw, plateW, plateH, wallT } = model;
+  const cols = Math.ceil(plateW/res), rows = Math.ceil(plateH/res);
+  const open = Array.from({length:rows}, () => new Array(cols).fill(false));
+  function carve(x0,y0,x1,y1) {
+    const minx=Math.min(x0,x1)-cw/2, maxx=Math.max(x0,x1)+cw/2;
+    const miny=Math.min(y0,y1)-cw/2, maxy=Math.max(y0,y1)+cw/2;
+    const c0=Math.max(0,Math.floor(minx/res)), c1=Math.min(cols-1,Math.ceil(maxx/res));
+    const r0=Math.max(0,Math.floor(miny/res)), r1=Math.min(rows-1,Math.ceil(maxy/res));
+    for(let r=r0;r<=r1;r++)for(let c=c0;c<=c1;c++){
+      const px=c*res+res/2, py=r*res+res/2;
+      if(px>=minx&&px<=maxx&&py>=miny&&py<=maxy) open[r][c]=true;
+    }
+  }
+  for(const s of segments) carve(s.x0,s.y0,s.x1,s.y1);
+  for(const s of stubs)    carve(s.x0,s.y0,s.x1,s.y1);
+  const wt = Math.max(1, Math.round(wallT/res));
+  const wall = Array.from({length:rows}, () => new Array(cols).fill(false));
+  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
+    if(open[r][c]) continue;
+    let near=false;
+    for(let dr=-wt;dr<=wt&&!near;dr++)for(let dc=-wt;dc<=wt;dc++){
+      const rr=r+dr, cc=c+dc;
+      if(rr>=0&&rr<rows&&cc>=0&&cc<cols&&open[rr][cc]){near=true;break;}
+    }
+    if(near) wall[r][c]=true;
+  }
+  return {open, wall, cols, rows, res};
+}
+
+// 2D greedy rectangle merge → wall boxes {x,y,w,h} (mm footprint)
+function wallBoxesST(ras) {
+  const {wall, cols, rows, res} = ras;
+  const used = Array.from({length:rows}, () => new Array(cols).fill(false));
+  const boxes = [];
+  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
+    if(!wall[r][c]||used[r][c]) continue;
+    let w=1; while(c+w<cols&&wall[r][c+w]&&!used[r][c+w]) w++;
+    let h=1, ok=true;
+    while(r+h<rows&&ok){for(let k=0;k<w;k++){if(!wall[r+h][c+k]||used[r+h][c+k]){ok=false;break;}}if(ok)h++;}
+    for(let rr=r;rr<r+h;rr++)for(let cc=c;cc<c+w;cc++)used[rr][cc]=true;
+    boxes.push({x:c*res, y:r*res, w:w*res, h:h*res});
+  }
+  return boxes;
+}
+
+// ── 高さフィールド → 単一 manifold メッシュ（自己交差・内部面なし、構造下のみ床）──
+// solid = open|wall。height = wall? floorT+wallH : floorT。bottom = z0。
+function heightfieldTris(open, wall, res, floorT, wallH, z0) {
+  z0 = z0 || 0;
+  const rows = open.length, cols = open[0].length;
+  const tris = [];
+  const solid = (r,c) => r>=0 && r<rows && c>=0 && c<cols && (open[r][c] || wall[r][c]);
+  const topZ  = (r,c) => z0 + floorT + (wall[r][c] ? wallH : 0);
+  function quad(n, a,b,c,d) {
+    tris.push([n[0],n[1],n[2], a[0],a[1],a[2], b[0],b[1],b[2], c[0],c[1],c[2]]);
+    tris.push([n[0],n[1],n[2], a[0],a[1],a[2], c[0],c[1],c[2], d[0],d[1],d[2]]);
+  }
+  const L = z0 + floorT; // 床上面レベル。段差はここで分割して T字接合を防ぐ
+  for (let r=0;r<rows;r++) for (let c=0;c<cols;c++) {
+    if (!solid(r,c)) continue;
+    const X0=c*res, X1=(c+1)*res, Y0=r*res, Y1=(r+1)*res, tz=topZ(r,c);
+    quad([0,0,1],  [X0,Y0,tz],[X1,Y0,tz],[X1,Y1,tz],[X0,Y1,tz]);  // top
+    quad([0,0,-1], [X0,Y0,z0],[X0,Y1,z0],[X1,Y1,z0],[X1,Y0,z0]);  // bottom
+    // 側面エミッタ（z 範囲 a..b）。dir ごとに winding を分ける
+    const emit = {
+      '-X': (a,b)=>quad([-1,0,0],[X0,Y0,a],[X0,Y0,b],[X0,Y1,b],[X0,Y1,a]),
+      '+X': (a,b)=>quad([1,0,0], [X1,Y0,a],[X1,Y1,a],[X1,Y1,b],[X1,Y0,b]),
+      '-Y': (a,b)=>quad([0,-1,0],[X0,Y0,a],[X1,Y0,a],[X1,Y0,b],[X0,Y0,b]),
+      '+Y': (a,b)=>quad([0,1,0], [X0,Y1,a],[X0,Y1,b],[X1,Y1,b],[X1,Y1,a]),
+    };
+    function side(dir, nz) { // nz..tz を、必要なら L で分割して張る
+      if (nz >= tz) return;
+      if (nz < L && L < tz) { emit[dir](nz, L); emit[dir](L, tz); }
+      else emit[dir](nz, tz);
+    }
+    side('-X', solid(r,c-1)?topZ(r,c-1):z0);
+    side('+X', solid(r,c+1)?topZ(r,c+1):z0);
+    side('-Y', solid(r-1,c)?topZ(r-1,c):z0);
+    side('+Y', solid(r+1,c)?topZ(r+1,c):z0);
+  }
+  return tris;
+}
+
+let state = { seed: 0, maze: null, path: [], currentView: '2d',
+              mode: 'maze', stModel: null, stBoxes: [], stStubStyle: 'deadend' };
+
+function buildSerialT() {
+  const p = getSTParams();
+  const model = generateSerialT(p);
+  const res = 1; // 1mm raster
+  const ras = rasterizeST(model, res);
+  state.stModel = model;
+  state.stRaster = ras;
+  state.stBoxes = wallBoxesST(ras);
+  // derived plate
+  const dp = document.getElementById('derived-plate');
+  const big = model.plateW > 256 || model.plateH > 256;
+  dp.innerHTML = `<span class="${big?'plate-warn':''}">${model.plateW.toFixed(0)} \xd7 ${model.plateH.toFixed(0)} mm${big?' ⚠':''}</span>`;
+  updateInfoBarST();
+  if (state.currentView === '2d') { resize2D(); redraw2D(); }
+  else rebuild3D();
+}
+
+function updateInfoBarST() {
+  const m = state.stModel; if (!m) return;
+  const tris = state.stBoxes.length*12 + 12;
+  document.getElementById('i-grid').textContent  = `${m.junctions.length} junc`;
+  document.getElementById('i-size').textContent  = `${m.plateW.toFixed(0)} \xd7 ${m.plateH.toFixed(0)} mm`;
+  document.getElementById('i-cell').textContent  = `${m.cw} mm wide`;
+  document.getElementById('i-walls').textContent = String(state.stBoxes.length);
+  document.getElementById('i-tris').textContent  = tris.toLocaleString();
+}
+
+function redraw2D_ST() {
+  const canvas=document.getElementById('canvas2d'), ctx=canvas.getContext('2d');
+  const CW=canvas.width, CH=canvas.height;
+  const m=state.stModel; if(!m||CW===0||CH===0) return;
+  const {plateW,plateH,cw}=m;
+  const PAD=52;
+  const scale=Math.min((CW-PAD*2)/plateW,(CH-PAD*2)/plateH);
+  const ox=(CW-plateW*scale)/2, oy=(CH-plateH*scale)/2;
+  const mx=x=>ox+x*scale, my=y=>oy+y*scale, ms=v=>v*scale;
+
+  ctx.clearRect(0,0,CW,CH);
+  ctx.fillStyle='#050918'; ctx.fillRect(0,0,CW,CH);
+  ctx.strokeStyle='rgba(0,180,230,0.04)'; ctx.lineWidth=1;
+  for(let x=0;x<CW;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,CH);ctx.stroke();}
+  for(let y=0;y<CH;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(CW,y);ctx.stroke();}
+  // floor plate
+  ctx.fillStyle='rgba(0,25,55,0.5)'; ctx.fillRect(mx(0),my(0),ms(plateW),ms(plateH));
+  ctx.strokeStyle='rgba(0,200,255,0.25)'; ctx.lineWidth=1;
+  ctx.strokeRect(mx(0),my(0),ms(plateW),ms(plateH));
+  // corridors (open) — draw centerlines as wide light strips
+  ctx.strokeStyle='rgba(0,200,255,0.07)'; ctx.lineCap='butt'; ctx.lineWidth=ms(cw);
+  for(const s of [...m.segments, ...m.stubs]){
+    ctx.beginPath(); ctx.moveTo(mx(s.x0),my(s.y0)); ctx.lineTo(mx(s.x1),my(s.y1)); ctx.stroke();
+  }
+  // walls
+  for(const b of state.stBoxes){
+    ctx.fillStyle='#0c3258'; ctx.fillRect(mx(b.x),my(b.y),ms(b.w),ms(b.h));
+    ctx.strokeStyle='rgba(0,200,255,0.5)'; ctx.lineWidth=0.6;
+    ctx.strokeRect(mx(b.x)+0.3,my(b.y)+0.3,ms(b.w)-0.6,ms(b.h)-0.6);
+  }
+  // solution (through) path
+  if (document.getElementById('p-path').checked && m.path.length>1) {
+    const pts=m.path;
+    ctx.save(); ctx.lineCap='round'; ctx.lineJoin='round';
+    ctx.strokeStyle='rgba(255,200,0,0.12)'; ctx.lineWidth=ms(cw*0.5);
+    ctx.beginPath(); pts.forEach(([px,py],i)=>i===0?ctx.moveTo(mx(px),my(py)):ctx.lineTo(mx(px),my(py))); ctx.stroke();
+    ctx.strokeStyle='#ffc800'; ctx.lineWidth=2; ctx.setLineDash([Math.max(ms(2),3),Math.max(ms(1.5),2)]);
+    ctx.shadowColor='#ffc800'; ctx.shadowBlur=6;
+    ctx.beginPath(); pts.forEach(([px,py],i)=>i===0?ctx.moveTo(mx(px),my(py)):ctx.lineTo(mx(px),my(py))); ctx.stroke();
+    ctx.setLineDash([]); ctx.shadowBlur=0; ctx.restore();
+  }
+  // J2+ trap dead-ends — red ✗ (閉じた罠)
+  if (m.trapEnds && m.trapEnds.length) {
+    ctx.strokeStyle='#ff4466'; ctx.lineWidth=2; ctx.lineCap='round';
+    for (const e of m.trapEnds) {
+      const ex=mx(e.x), ey=my(e.y), s=4.5;
+      ctx.beginPath(); ctx.moveTo(ex-s,ey-s); ctx.lineTo(ex+s,ey+s);
+      ctx.moveTo(ex+s,ey-s); ctx.lineTo(ex-s,ey+s); ctx.stroke();
+    }
+  }
+  // J1 alt-exit (escapable, 最初の転向の他方) — cyan ◇ ring
+  if (m.altExit) {
+    ctx.strokeStyle='#00c8ff'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(mx(m.altExit.x),my(m.altExit.y),5.5,0,Math.PI*2); ctx.stroke();
+  }
+  // entrance (green) / goal (amber) — open exits, filled dots
+  ctx.fillStyle='#00ff88'; ctx.beginPath(); ctx.arc(mx(m.entrance.x),my(m.entrance.y),5,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#ff9d00'; ctx.beginPath(); ctx.arc(mx(m.exit.x),my(m.exit.y),5,0,Math.PI*2); ctx.fill();
+  // junction labels
+  ctx.font='bold 11px Orbitron, monospace'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  for(const j of m.junctions){
+    const bx=mx(j.x), by=my(j.y), rr=9;
+    ctx.fillStyle='rgba(6,15,38,0.92)'; ctx.beginPath(); ctx.arc(bx,by,rr,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle='#00c8ff'; ctx.lineWidth=1.2; ctx.stroke();
+    ctx.fillStyle='#d8eef8'; ctx.fillText(String(j.label),bx,by+0.5);
+  }
+  ctx.textBaseline='alphabetic';
+  // legend
+  ctx.font='9px JetBrains Mono'; ctx.textAlign='right';
+  ctx.fillStyle='#00ff88'; ctx.fillText('● START (in)',CW-12,CH-50);
+  ctx.fillStyle='#ff9d00'; ctx.fillText('● GOAL (out)',CW-12,CH-37);
+  ctx.fillStyle='#00c8ff'; ctx.fillText('◯ 1st-turn alt exit (out)',CW-12,CH-24);
+  ctx.fillStyle='#ff4466'; ctx.fillText('✕ trap (dead-end)',CW-12,CH-11);
+}
+
+function rebuild3D_ST() {
+  if(!three.renderer||!state.stModel) return;
+  const {scene,camera,controls}=three;
+  const old=scene.getObjectByName('mazeGroup');
+  if(old){ old.traverse(o=>{if(o.isMesh){o.geometry.dispose();if(Array.isArray(o.material))o.material.forEach(mm=>mm.dispose());else if(o.material)o.material.dispose();}}); scene.remove(old); }
+  const oldG=scene.getObjectByName('gridHelper'); if(oldG)scene.remove(oldG);
+
+  const m=state.stModel, p=getSTParams();
+  const {plateW,plateH}=m, {wallH,floorT}=p;
+  const wallMat=new THREE.MeshLambertMaterial({color:0x2a80c8});
+  const floorMat=new THREE.MeshLambertMaterial({color:0x0f3555});
+  const edgeMat=new THREE.LineBasicMaterial({color:0x55ccff,transparent:true,opacity:0.4});
+  const group=new THREE.Group(); group.name='mazeGroup';
+  function addBox(x,z,y0,w,d,h,mat){
+    if(w<=0||d<=0||h<=0)return;
+    const geo=new THREE.BoxGeometry(w,h,d);
+    const mesh=new THREE.Mesh(geo,mat); mesh.position.set(x+w/2,y0+h/2,z+d/2); group.add(mesh);
+    const el=new THREE.LineSegments(new THREE.EdgesGeometry(geo),edgeMat); el.position.copy(mesh.position); group.add(el);
+  }
+  addBox(0,0,-floorT,plateW,plateH,floorT,floorMat);
+  for(const b of state.stBoxes) addBox(b.x,b.y,0,b.w,b.h,wallH,wallMat);
+  // path markers
+  if(document.getElementById('p-path').checked && m.path.length>1){
+    const seg=m.cw*0.4, ph=0.8;
+    const n=m.path.length;
+    for(let i=0;i<n;i++){
+      const [px,py]=m.path[i];
+      const t=n>1?i/(n-1):0;
+      const cr=Math.round(255*t), cg=Math.round(255*(1-t)+200*t), cb=Math.round(136*(1-t));
+      const mat=new THREE.MeshLambertMaterial({color:(cr<<16)|(cg<<8)|cb, emissive:((cr*0.4|0)<<16)|((cg*0.4|0)<<8)|(cb*0.4|0)});
+      const geo=new THREE.BoxGeometry(seg,ph,seg);
+      const mesh=new THREE.Mesh(geo,mat); mesh.position.set(px,ph/2,py); group.add(mesh);
+    }
+  }
+  scene.add(group); group.position.set(-plateW/2,0,-plateH/2);
+  const maxDim=Math.max(plateW,plateH);
+  const gs=Math.ceil(maxDim*2/50)*50;
+  const grid=new THREE.GridHelper(gs,Math.max(2,Math.floor(gs/20)),0x0a2540,0x0a2540);
+  grid.name='gridHelper'; grid.position.y=-floorT; scene.add(grid);
+  const dist=maxDim*1.15;
+  camera.position.set(0,dist*0.85,dist*0.75); camera.lookAt(0,0,0); controls.target.set(0,0,0); controls.update();
+}
+
+function buildExportGeometryST() {
+  const m=state.stModel, ras=state.stRaster; if(!m||!ras) return null;
+  const p=getSTParams();
+  const tris = heightfieldTris(ras.open, ras.wall, ras.res, p.floorT, p.wallH);
+  return {tris, totalW:m.plateW, totalH:m.plateH};
+}
+
+function updateDerivedCell(p) {
+  const dc = document.getElementById('derived-cell');
+  if (p.cellW < 2 || p.cellH < 2) {
+    dc.innerHTML = `<span class="cell-warn">${p.cellW.toFixed(1)} \xd7 ${p.cellH.toFixed(1)} mm ⚠</span>`;
+  } else {
+    dc.textContent = `${p.cellW.toFixed(1)} \xd7 ${p.cellH.toFixed(1)} mm`;
+    dc.className = 'cell-derived-val';
+  }
+}
+
+function buildMaze(newSeed) {
+  if (state.mode === 'serialT') { buildSerialT(); return; }
+  if (newSeed !== undefined) state.seed = newSeed;
+  const p = getParams();
+  updateDerivedCell(p);
+  const rng = makePRNG(state.seed);
+  const walls = generateMaze(p.rows, p.cols, p.openness, rng);
+  const entranceCol = resolveOpeningCol(document.getElementById('p-entrance').value, p.cols);
+  const exitCol     = resolveOpeningCol(document.getElementById('p-exit').value, p.cols);
+  state.maze = { rows: p.rows, cols: p.cols, walls, entranceCol, exitCol };
+  state.path = solveMaze(state.maze);
+  document.getElementById('seed-display').textContent = String(state.seed).padStart(6,'0');
+  updateInfoBar(p);
+  if (state.currentView === '2d') { resize2D(); redraw2D(); }
+  else rebuild3D();
+}
+
+function updateInfoBar(p) {
+  if (!state.maze) return;
+  const {rows, cols, walls, entranceCol, exitCol} = state.maze;
+  let wc=0;
+  for(let r=0;r<=rows;r++) for(let c=0;c<cols;c++) {
+    const hw=r===0?c!==entranceCol:r===rows?c!==exitCol:walls[r][c].N;
+    if(hw)wc++;
+  }
+  for(let r=0;r<rows;r++) for(let c=0;c<=cols;c++) { if(c===0||c===cols||walls[r][c].W)wc++; }
+  const tris=((rows+1)*(cols+1)+wc+1)*12;
+  document.getElementById('i-grid').textContent  = `${p.cols} \xd7 ${p.rows}`;
+  document.getElementById('i-size').textContent  = `${p.totalW} \xd7 ${p.totalH} mm`;
+  document.getElementById('i-cell').textContent  = `${p.cellW.toFixed(1)} \xd7 ${p.cellH.toFixed(1)} mm`;
+  document.getElementById('i-walls').textContent = String(wc);
+  document.getElementById('i-tris').textContent  = tris.toLocaleString();
+}
+
+// ── 2D ──
+function resize2D() {
+  const ca=document.getElementById('canvas-area'), c=document.getElementById('canvas2d');
+  c.width=ca.clientWidth; c.height=ca.clientHeight;
+}
+
+function redraw2D() {
+  if (state.mode === 'serialT') { redraw2D_ST(); return; }
+  const canvas=document.getElementById('canvas2d'), ctx=canvas.getContext('2d');
+  const CW=canvas.width, CH=canvas.height;
+  if (!state.maze||CW===0||CH===0) return;
+  const {rows,cols,walls,entranceCol,exitCol}=state.maze;
+  const p=getParams();
+  const {cellW,cellH,wallT}=p;
+  const stepX=cellW+wallT, stepY=cellH+wallT;
+  const mazeW=cols*stepX+wallT, mazeH=rows*stepY+wallT;
+  const PAD=52;
+  const scale=Math.min((CW-PAD*2)/mazeW,(CH-PAD*2)/mazeH);
+  const ox=(CW-mazeW*scale)/2, oy=(CH-mazeH*scale)/2;
+  const mx=x=>ox+x*scale, my=y=>oy+y*scale, ms=v=>v*scale;
+
+  ctx.clearRect(0,0,CW,CH);
+  ctx.fillStyle='#050918'; ctx.fillRect(0,0,CW,CH);
+  ctx.strokeStyle='rgba(0,180,230,0.04)'; ctx.lineWidth=1;
+  for(let x=0;x<CW;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,CH);ctx.stroke();}
+  for(let y=0;y<CH;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(CW,y);ctx.stroke();}
+  ctx.fillStyle='rgba(0,25,55,0.6)'; ctx.fillRect(mx(0),my(0),ms(mazeW),ms(mazeH));
+  for(let r=0;r<rows;r++) for(let c=0;c<cols;c++) {
+    ctx.fillStyle='rgba(0,200,255,0.03)';
+    ctx.fillRect(mx(c*stepX+wallT),my(r*stepY+wallT),ms(cellW),ms(cellH));
+  }
+
+  function drawWall(x,y,w,h){
+    ctx.fillStyle='#0c3258'; ctx.fillRect(mx(x),my(y),ms(w),ms(h));
+    ctx.strokeStyle='rgba(0,200,255,0.55)'; ctx.lineWidth=0.8;
+    ctx.strokeRect(mx(x)+0.5,my(y)+0.5,ms(w)-1,ms(h)-1);
+  }
+  function drawOpening(x,y,w,h,isE){
+    const clr=isE?'rgba(0,255,136,0.18)':'rgba(255,157,0,0.18)';
+    const stroke=isE?'#00ff88':'#ff9d00';
+    ctx.fillStyle=clr; ctx.fillRect(mx(x),my(y),ms(w),ms(h));
+    ctx.strokeStyle=stroke; ctx.lineWidth=1.5;
+    ctx.strokeRect(mx(x)+0.5,my(y)+0.5,ms(w)-1,ms(h)-1);
+    const cx2=mx(x)+ms(w)/2, cy2=isE?my(y)-8:my(y)+ms(h)+8, dy=isE?1:-1;
+    ctx.fillStyle=stroke; ctx.beginPath();
+    ctx.moveTo(cx2,cy2+dy*6); ctx.lineTo(cx2-5,cy2-dy*2); ctx.lineTo(cx2+5,cy2-dy*2);
+    ctx.closePath(); ctx.fill();
+  }
+
+  for(let r=0;r<=rows;r++) for(let c=0;c<=cols;c++){
+    ctx.fillStyle='#1a5580'; ctx.fillRect(mx(c*stepX),my(r*stepY),ms(wallT),ms(wallT));
+    ctx.strokeStyle='rgba(0,200,255,0.7)'; ctx.lineWidth=0.8;
+    ctx.strokeRect(mx(c*stepX)+0.5,my(r*stepY)+0.5,ms(wallT)-1,ms(wallT)-1);
+  }
+  for(let r=0;r<=rows;r++) for(let c=0;c<cols;c++){
+    let hw,isE=false,isX=false;
+    if(r===0){hw=c!==entranceCol;if(!hw)isE=true;}
+    else if(r===rows){hw=c!==exitCol;if(!hw)isX=true;}
+    else{hw=walls[r][c].N;}
+    const x=c*stepX+wallT, y=r*stepY;
+    if(hw)drawWall(x,y,cellW,wallT);
+    else if(isE)drawOpening(x,y,cellW,wallT,true);
+    else if(isX)drawOpening(x,y,cellW,wallT,false);
+  }
+  for(let r=0;r<rows;r++) for(let c=0;c<=cols;c++){
+    const hw=(c===0||c===cols)?true:walls[r][c].W;
+    if(hw)drawWall(c*stepX,r*stepY+wallT,wallT,cellH);
+  }
+
+  ctx.font='10px JetBrains Mono'; ctx.fillStyle='rgba(0,200,255,0.45)'; ctx.strokeStyle='rgba(0,200,255,0.3)'; ctx.lineWidth=1;
+  const dy2=my(mazeH)+20;
+  ctx.beginPath();ctx.moveTo(mx(0),dy2);ctx.lineTo(mx(mazeW),dy2);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(mx(0),dy2-4);ctx.lineTo(mx(0),dy2+4);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(mx(mazeW),dy2-4);ctx.lineTo(mx(mazeW),dy2+4);ctx.stroke();
+  ctx.textAlign='center'; ctx.fillText(`${p.totalW} mm`,(mx(0)+mx(mazeW))/2,dy2+13);
+  const dx2=mx(mazeW)+20;
+  ctx.beginPath();ctx.moveTo(dx2,my(0));ctx.lineTo(dx2,my(mazeH));ctx.stroke();
+  ctx.beginPath();ctx.moveTo(dx2-4,my(0));ctx.lineTo(dx2+4,my(0));ctx.stroke();
+  ctx.beginPath();ctx.moveTo(dx2-4,my(mazeH));ctx.lineTo(dx2+4,my(mazeH));ctx.stroke();
+  ctx.save();ctx.translate(dx2+13,(my(0)+my(mazeH))/2);ctx.rotate(Math.PI/2);ctx.textAlign='center';ctx.fillText(`${p.totalH} mm`,0,0);ctx.restore();
+  // ── Solution path ──
+  if (document.getElementById('p-path').checked && state.path && state.path.length > 1) {
+    const path = state.path;
+    const pts = [];
+    // From outside entrance
+    pts.push([entranceCol*stepX + wallT + cellW/2, -wallT*0.5]);
+    for (const [r,c] of path) pts.push([c*stepX + wallT + cellW/2, r*stepY + wallT + cellH/2]);
+    // To outside exit
+    pts.push([exitCol*stepX + wallT + cellW/2, mazeH + wallT*0.5]);
+
+    // Glow layer
+    ctx.save();
+    ctx.lineCap='round'; ctx.lineJoin='round';
+    ctx.strokeStyle='rgba(255,200,0,0.12)';
+    ctx.lineWidth = ms(Math.min(cellW, cellH) * 0.55);
+    ctx.beginPath();
+    pts.forEach(([px,py],i)=>i===0?ctx.moveTo(mx(px),my(py)):ctx.lineTo(mx(px),my(py)));
+    ctx.stroke();
+
+    // Medium glow
+    ctx.strokeStyle='rgba(255,200,0,0.25)';
+    ctx.lineWidth = ms(Math.min(cellW, cellH) * 0.28);
+    ctx.beginPath();
+    pts.forEach(([px,py],i)=>i===0?ctx.moveTo(mx(px),my(py)):ctx.lineTo(mx(px),my(py)));
+    ctx.stroke();
+
+    // Core dashed line
+    const dashLen = Math.max(ms(2), 3), gapLen = Math.max(ms(1.5), 2);
+    ctx.strokeStyle='#ffc800';
+    ctx.lineWidth=2;
+    ctx.setLineDash([dashLen, gapLen]);
+    ctx.shadowColor='#ffc800'; ctx.shadowBlur=6;
+    ctx.beginPath();
+    pts.forEach(([px,py],i)=>i===0?ctx.moveTo(mx(px),my(py)):ctx.lineTo(mx(px),my(py)));
+    ctx.stroke();
+
+    // Start/end dots
+    ctx.setLineDash([]); ctx.shadowBlur=0;
+    [[pts[0],'#00ff88'],[pts[pts.length-1],'#ff9d00']].forEach(([[px,py],clr])=>{
+      ctx.fillStyle=clr;
+      ctx.beginPath(); ctx.arc(mx(px),my(py),4,0,Math.PI*2); ctx.fill();
+    });
+
+    // Step count badge
+    const midPt = pts[Math.floor(pts.length/2)];
+    const stepsText = `${path.length} steps`;
+    ctx.font='bold 9px JetBrains Mono'; ctx.textAlign='center';
+    const tw=ctx.measureText(stepsText).width;
+    const bx=mx(midPt[0]), by=my(midPt[1]);
+    ctx.fillStyle='rgba(0,0,0,0.7)'; ctx.fillRect(bx-tw/2-4,by-8,tw+8,14);
+    ctx.fillStyle='#ffc800'; ctx.fillText(stepsText,bx,by+3);
+
+    ctx.restore();
+  }
+
+  ctx.font='9px JetBrains Mono'; ctx.textAlign='right';
+  ctx.fillStyle='#00ff88'; ctx.fillText('▼ ENTRANCE',CW-12,CH-26);
+  ctx.fillStyle='#ff9d00'; ctx.fillText('▲ EXIT',CW-12,CH-12);
+}
+
+// ── 3D ──
+let three = { renderer:null, scene:null, camera:null, controls:null, raf:null };
+
+function init3D() {
+  if (three.raf) { cancelAnimationFrame(three.raf); three.raf=null; }
+  if (three.renderer) { three.renderer.dispose(); three.renderer=null; }
+
+  const ca=document.getElementById('canvas-area');
+  const W=Math.max(ca.clientWidth,100), H=Math.max(ca.clientHeight,100);
+
+  const canvas=document.getElementById('canvas3d');
+  canvas.style.width=W+'px'; canvas.style.height=H+'px';
+  canvas.width=W; canvas.height=H;
+
+  const renderer=new THREE.WebGLRenderer({canvas, antialias:true});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+  renderer.setSize(W,H,false);
+  renderer.setClearColor(0x08101e,1);
+
+  const scene=new THREE.Scene();
+  const camera=new THREE.PerspectiveCamera(50,W/H,0.5,8000);
+  camera.position.set(0,280,350); camera.lookAt(0,0,0);
+
+  const controls=new THREE.OrbitControls(camera,renderer.domElement);
+  controls.enableDamping=true; controls.dampingFactor=0.07;
+  controls.screenSpacePanning=true;
+  controls.minDistance=20; controls.maxDistance=5000;
+  controls.target.set(0,0,0); controls.update();
+
+  scene.add(new THREE.AmbientLight(0xffffff,0.7));
+  const sun=new THREE.DirectionalLight(0xffffff,1.0);
+  sun.position.set(300,500,200); scene.add(sun);
+  const fill=new THREE.DirectionalLight(0x88d8ff,0.5);
+  fill.position.set(-200,150,-200); scene.add(fill);
+
+  three={renderer,scene,camera,controls,raf:null};
+
+  function animate(){
+    three.raf=requestAnimationFrame(animate);
+    controls.update();
+    renderer.render(scene,camera);
+  }
+  animate();
+}
+
+function rebuild3D() {
+  if (state.mode === 'serialT') { rebuild3D_ST(); return; }
+  if (!three.renderer||!state.maze) return;
+  const {scene,camera,controls}=three;
+
+  const old=scene.getObjectByName('mazeGroup');
+  if (old) {
+    old.traverse(o=>{if(o.isMesh){o.geometry.dispose();if(Array.isArray(o.material))o.material.forEach(m=>m.dispose());else if(o.material)o.material.dispose();}});
+    scene.remove(old);
+  }
+  const oldG=scene.getObjectByName('gridHelper');
+  if(oldG)scene.remove(oldG);
+
+  const {rows,cols,walls,entranceCol,exitCol}=state.maze;
+  const p=getParams();
+  const {cellW,cellH,wallH,wallT,floorT}=p;
+  if(cellW<=0||cellH<=0) return;
+
+  const stepX=cellW+wallT, stepY=cellH+wallT;
+  const totalW=cols*stepX+wallT, totalD=rows*stepY+wallT;
+
+  const wallMat =new THREE.MeshLambertMaterial({color:0x2a80c8});
+  const floorMat=new THREE.MeshLambertMaterial({color:0x0f3555});
+  const edgeMat =new THREE.LineBasicMaterial({color:0x55ccff,transparent:true,opacity:0.45});
+
+  const group=new THREE.Group(); group.name='mazeGroup';
+
+  function addBox(x,z,y0,w,d,h,mat){
+    if(w<=0||d<=0||h<=0)return;
+    const geo=new THREE.BoxGeometry(w,h,d);
+    const mesh=new THREE.Mesh(geo,mat);
+    mesh.position.set(x+w/2,y0+h/2,z+d/2);
+    group.add(mesh);
+    const eg=new THREE.EdgesGeometry(geo);
+    const el=new THREE.LineSegments(eg,edgeMat);
+    el.position.copy(mesh.position); group.add(el);
+  }
+
+  addBox(0,0,-floorT,totalW,totalD,floorT,floorMat);
+  for(let r=0;r<=rows;r++) for(let c=0;c<=cols;c++) addBox(c*stepX,r*stepY,0,wallT,wallT,wallH,wallMat);
+  for(let r=0;r<=rows;r++) for(let c=0;c<cols;c++){
+    let hw;
+    if(r===0)hw=c!==entranceCol;
+    else if(r===rows)hw=c!==exitCol;
+    else hw=walls[r][c].N;
+    if(hw)addBox(c*stepX+wallT,r*stepY,0,cellW,wallT,wallH,wallMat);
+  }
+  for(let r=0;r<rows;r++) for(let c=0;c<=cols;c++){
+    const hw=(c===0||c===cols)?true:walls[r][c].W;
+    if(hw)addBox(c*stepX,r*stepY+wallT,0,wallT,cellH,wallH,wallMat);
+  }
+
+  // ── Solution path in 3D ──
+  if (document.getElementById('p-path').checked && state.path && state.path.length > 1) {
+    const pathMat = new THREE.MeshLambertMaterial({color:0xffc800, emissive:0x885500, emissiveIntensity:0.6});
+    const pathH = 0.8; // thin raised marker
+    const path = state.path;
+    const n = path.length;
+    for (let i=0; i<n; i++) {
+      const [r,c] = path[i];
+      // Lerp color from green(entrance) to amber(exit)
+      const t = n > 1 ? i/(n-1) : 0;
+      const mat = pathMat.clone();
+      // green #00ff88 → amber #ffc800
+      const cr = Math.round(0*( 1-t) + 255*t);
+      const cg = Math.round(255*(1-t) + 200*t);
+      const cb = Math.round(136*(1-t) +   0*t);
+      mat.color.setRGB(cr/255, cg/255, cb/255);
+      mat.emissive.setRGB(cr/255*0.4, cg/255*0.4, cb/255*0.4);
+      const geo=new THREE.BoxGeometry(cellW*0.55, pathH, cellH*0.55);
+      const mesh=new THREE.Mesh(geo, mat);
+      mesh.position.set(c*stepX + wallT + cellW/2, pathH/2, r*stepY + wallT + cellH/2);
+      group.add(mesh);
+    }
+    pathMat.dispose();
+  }
+
+  scene.add(group);
+  group.position.set(-totalW/2,0,-totalD/2);
+
+  const maxDim=Math.max(totalW,totalD);
+  const gs=Math.ceil(maxDim*2/50)*50;
+  const grid=new THREE.GridHelper(gs,Math.max(2,Math.floor(gs/20)),0x0a2540,0x0a2540);
+  grid.name='gridHelper'; grid.position.y=-floorT; scene.add(grid);
+
+  const dist=maxDim*1.15;
+  camera.position.set(0,dist*0.85,dist*0.75);
+  camera.lookAt(0,0,0); controls.target.set(0,0,0); controls.update();
+}
+
+function resize3D(){
+  if(!three.renderer)return;
+  const ca=document.getElementById('canvas-area');
+  const W=Math.max(ca.clientWidth,100), H=Math.max(ca.clientHeight,100);
+  const canvas=document.getElementById('canvas3d');
+  canvas.style.width=W+'px'; canvas.style.height=H+'px';
+  three.renderer.setSize(W,H,false);
+  three.camera.aspect=W/H; three.camera.updateProjectionMatrix();
+}
+
+// ── Export ──
+// ランダム迷路を open/wall ラスタ化（床は矩形全面、壁を上に）→ heightfield と同じ経路へ
+function rasterizeMaze(maze, p, res){
+  res = res || 1;
+  const {rows,cols,walls,entranceCol,exitCol}=maze;
+  const {cellW,cellH,wallT}=p;
+  const stepX=cellW+wallT, stepY=cellH+wallT;
+  const totalW=cols*stepX+wallT, totalH=rows*stepY+wallT;
+  const C=Math.ceil(totalW/res), R=Math.ceil(totalH/res);
+  const open=Array.from({length:R},()=>new Array(C).fill(true)); // 床は全面
+  const wall=Array.from({length:R},()=>new Array(C).fill(false));
+  function fillWall(x0,y0,x1,y1){
+    const c0=Math.max(0,Math.floor(x0/res)),c1=Math.min(C-1,Math.ceil(x1/res)-1);
+    const r0=Math.max(0,Math.floor(y0/res)),r1=Math.min(R-1,Math.ceil(y1/res)-1);
+    for(let r=r0;r<=r1;r++)for(let c=c0;c<=c1;c++){const px=c*res+res/2,py=r*res+res/2;
+      if(px>=x0&&px<=x1&&py>=y0&&py<=y1) wall[r][c]=true;}
+  }
+  for(let r=0;r<=rows;r++) for(let c=0;c<=cols;c++) fillWall(c*stepX,r*stepY,c*stepX+wallT,r*stepY+wallT); // 支柱
+  for(let r=0;r<=rows;r++) for(let c=0;c<cols;c++){
+    let hw;if(r===0)hw=c!==entranceCol;else if(r===rows)hw=c!==exitCol;else hw=walls[r][c].N;
+    if(hw)fillWall(c*stepX+wallT,r*stepY,c*stepX+wallT+cellW,r*stepY+wallT);
+  }
+  for(let r=0;r<rows;r++) for(let c=0;c<=cols;c++){
+    const hw=(c===0||c===cols)?true:walls[r][c].W;
+    if(hw)fillWall(c*stepX,r*stepY+wallT,c*stepX+wallT,r*stepY+wallT+cellH);
+  }
+  for(let r=0;r<R;r++)for(let c=0;c<C;c++) if(wall[r][c]) open[r][c]=false;
+  return {open,wall,res,totalW,totalH};
+}
+
+function buildExportGeometry(){
+  if(state.mode==='serialT') return buildExportGeometryST();
+  if(!state.maze)return null;
+  const p=getParams();
+  if(p.cellW<=0||p.cellH<=0)return null;
+  const ras=rasterizeMaze(state.maze,p,1);
+  const tris=heightfieldTris(ras.open,ras.wall,ras.res,p.floorT,p.wallH);
+  return {tris, totalW:ras.totalW, totalH:ras.totalH};
+}
+
+function exportSTL(){
+  const geo=buildExportGeometry();if(!geo)return;
+  const {tris}=geo;
+  const buf=new ArrayBuffer(84+tris.length*50);
+  const dv=new DataView(buf);
+  const hdr='ISOPOD MAZE ARCHITECT';
+  for(let i=0;i<80;i++)dv.setUint8(i,i<hdr.length?hdr.charCodeAt(i):0);
+  dv.setUint32(80,tris.length,true);
+  let off=84;
+  for(const t of tris){for(let i=0;i<12;i++){dv.setFloat32(off,t[i],true);off+=4;}dv.setUint16(off,0,true);off+=2;}
+  dl(new Blob([buf],{type:'application/octet-stream'}),`isopod_maze_${state.seed}.stl`);
+}
+
+function dl(blob,name){
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=name;a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+
+window.addEventListener('resize',()=>{
+  if(state.currentView==='2d'){resize2D();redraw2D();}else resize3D();
+});
+
+const SLIDERS=[
+  {id:'p-rows',    vid:'v-rows',    fmt:v=>v,                                                           regen:true},
+  {id:'p-cols',    vid:'v-cols',    fmt:v=>v,                                                           regen:true},
+  {id:'p-openness',vid:'v-openness',fmt:v=>`${v}<span class="unit">%</span>`,                           regen:true},
+  {id:'p-totalW',  vid:'v-totalW',  fmt:v=>`${v}<span class="unit">mm</span>`,                          regen:false},
+  {id:'p-totalH',  vid:'v-totalH',  fmt:v=>`${v}<span class="unit">mm</span>`,                          regen:false},
+  {id:'p-height',  vid:'v-height',  fmt:v=>`${v}<span class="unit">mm</span>`,                          regen:false},
+  {id:'p-thick',   vid:'v-thick',   fmt:v=>`${parseFloat(v).toFixed(1)}<span class="unit">mm</span>`,  regen:false},
+  {id:'p-floor',   vid:'v-floor',   fmt:v=>`${parseFloat(v).toFixed(1)}<span class="unit">mm</span>`,  regen:false},
+];
+SLIDERS.forEach(({id,vid,fmt,regen})=>{
+  const el=document.getElementById(id),vel=document.getElementById(vid);
+  el.addEventListener('input',()=>{
+    vel.innerHTML=fmt(el.value);
+    if(state.mode==='serialT'){ buildSerialT(); return; }
+    if(regen){buildMaze();}else{
+      const p=getParams();updateDerivedCell(p);updateInfoBar(p);
+      if(state.currentView==='2d')redraw2D();else rebuild3D();
+    }
+  });
+});
+
+// ── Serial-T sliders ──
+const ST_SLIDERS=[
+  {id:'p-njunc',vid:'v-njunc',fmt:v=>v},
+  {id:'p-seg',  vid:'v-seg',  fmt:v=>`${v}<span class="unit">mm</span>`},
+  {id:'p-corr', vid:'v-corr', fmt:v=>`${v}<span class="unit">mm</span>`},
+  {id:'p-stub', vid:'v-stub', fmt:v=>`${v}<span class="unit">mm</span>`},
+];
+ST_SLIDERS.forEach(({id,vid,fmt})=>{
+  const el=document.getElementById(id), vel=document.getElementById(vid);
+  el.addEventListener('input',()=>{ vel.innerHTML=fmt(el.value); buildSerialT(); });
+});
+document.getElementById('p-firstturn').addEventListener('change',()=>buildSerialT());
+
+// ── Mode switch ──
+const MODE_NOTES={
+  maze:'ランダム生成の正方グリッド迷路。',
+  serialT:'交替性転向の実験用。分岐ごとに直進ブロック・片側 through・片側 行き止まり。分岐は番号付き。FC間距離=分岐間の直線長（実験の主変数）。通路幅は採取個体の体幅に合わせる。',
+};
+function setMode(mode){
+  state.mode=mode;
+  document.querySelectorAll('.mode-btn').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));
+  document.querySelectorAll('.mode-maze').forEach(s=>s.style.display=(mode==='maze')?'':'none');
+  document.querySelectorAll('.mode-serialT').forEach(s=>s.style.display=(mode==='serialT')?'':'none');
+  document.getElementById('mode-note').textContent=MODE_NOTES[mode];
+  document.getElementById('btn-generate').style.display=(mode==='maze')?'':'none';
+  document.getElementById('btn-regen').style.display=(mode==='maze')?'':'none';
+  if(mode==='serialT') buildSerialT(); else buildMaze();
+}
+document.querySelectorAll('.mode-btn').forEach(b=>{
+  b.addEventListener('click',()=>{ if(state.mode!==b.dataset.mode) setMode(b.dataset.mode); });
+});
+
+['p-entrance','p-exit'].forEach(id=>{
+  document.getElementById(id).addEventListener('change',()=>buildMaze());
+});
+document.getElementById('p-path').addEventListener('change',()=>{
+  if (state.currentView==='2d') redraw2D(); else rebuild3D();
+});
+
+document.getElementById('btn-generate').addEventListener('click',()=>buildMaze(Math.floor(Math.random()*999999)));
+document.getElementById('btn-regen').addEventListener('click',()=>buildMaze());
+document.getElementById('btn-stl').addEventListener('click',exportSTL);
+
+document.querySelectorAll('.tab').forEach(tab=>{
+  tab.addEventListener('click',()=>{
+    if(tab.classList.contains('active'))return;
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    state.currentView=tab.dataset.view;
+    const c2=document.getElementById('canvas2d');
+    const c3=document.getElementById('canvas3d');
+    const hint=document.getElementById('hint-3d');
+    if(state.currentView==='2d'){
+      c2.style.display='block';c3.style.display='none';hint.style.display='none';
+      resize2D();redraw2D();
+    }else{
+      c2.style.display='none';c3.style.display='block';hint.style.display='block';
+      requestAnimationFrame(()=>{
+        if(!three.renderer){init3D();rebuild3D();}
+        else{resize3D();rebuild3D();}
+      });
+    }
+  });
+});
+
+window.addEventListener('load',()=>{
+  document.getElementById('mode-note').textContent=MODE_NOTES['maze'];
+  resize2D();
+  buildMaze(Math.floor(Math.random()*999999));
+});
+</script>
+</body>
+</html>
