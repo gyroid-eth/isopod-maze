@@ -382,15 +382,40 @@ function generateTAMaze(rows, cols, rng) {
   }
   while (r<rows-1) carve(r+1,c,'S','N');                          // straight tail to bottom
   const entranceCol=0, exitCol=c;
-  // grow a spanning tree around the carved solution → perfect maze, unique solution = sol
   const DIRS=[{dr:-1,dc:0,f:'N',t:'S'},{dr:1,dc:0,f:'S',t:'N'},{dr:0,dc:-1,f:'W',t:'E'},{dr:0,dc:1,f:'E',t:'W'}];
-  const stack=sol.slice();
-  while (stack.length) {
-    const [cr,cc]=stack[stack.length-1];
-    const nb=DIRS.map(d=>({nr:cr+d.dr,nc:cc+d.dc,d})).filter(o=>o.nr>=0&&o.nr<rows&&o.nc>=0&&o.nc<cols&&!visited[o.nr][o.nc]);
-    if (!nb.length) { stack.pop(); continue; }
-    const {nr,nc,d}=nb[Math.floor(rng()*nb.length)];
-    walls[cr][cc][d.f]=false; walls[nr][nc][d.t]=false; visited[nr][nc]=true; stack.push([nr,nc]);
+  // growing-tree（sol の壁は一切触らない＝直進ブロック・直線部封印を保つ）
+  function growFrom(seed) {
+    const growth = seed.slice();
+    while (growth.length) {
+      const idx=Math.floor(rng()*growth.length);
+      const [cr,cc]=growth[idx];
+      const nb=DIRS.filter(d=>{const nr=cr+d.dr,nc=cc+d.dc;return nr>=0&&nr<rows&&nc>=0&&nc<cols&&!visited[nr][nc];});
+      if (!nb.length) { growth.splice(idx,1); continue; }
+      const d=nb[Math.floor(rng()*nb.length)];
+      const nr=cr+d.dr, nc=cc+d.dc;
+      walls[cr][cc][d.f]=false; walls[nr][nc][d.t]=false; visited[nr][nc]=true; growth.push([nr,nc]);
+    }
+  }
+  // 各角を T字分岐に: 直進=壁(開けない) / 正解ターン=開(sol) / 誤りターン(-正解)=開いて行き止まり枝
+  const wrongSeeds=[]; let cornerN=0;
+  for (let i=1;i<sol.length-1;i++) {
+    const inD={dr:sol[i][0]-sol[i-1][0], dc:sol[i][1]-sol[i-1][1]};
+    const outD={dr:sol[i+1][0]-sol[i][0], dc:sol[i+1][1]-sol[i][1]};
+    if (inD.dr===outD.dr && inD.dc===outD.dc) continue; // 直線部はスキップ
+    cornerN++;
+    if (cornerN===1) continue;                          // 最初のターンは例外（強制ターン）
+    const wr={dr:-outD.dr, dc:-outD.dc};                // 誤りターン = 正解の反対
+    const [r,c]=sol[i], nr=r+wr.dr, nc=c+wr.dc;
+    if (nr>=0&&nr<rows&&nc>=0&&nc<cols&&!visited[nr][nc]) {
+      const d=DIRS.find(o=>o.dr===wr.dr&&o.dc===wr.dc);
+      walls[r][c][d.f]=false; walls[nr][nc][d.t]=false; visited[nr][nc]=true; wrongSeeds.push([nr,nc]);
+    }
+  }
+  // 誤り枝を行き止まりサブ迷路に育てる
+  growFrom(wrongSeeds);
+  // 残りセルも迷路で埋める（sol に触れない別コンポーネント＝唯一解は維持）
+  for (let r=0;r<rows;r++) for (let c=0;c<cols;c++) {
+    if (!visited[r][c]) { visited[r][c]=true; growFrom([[r,c]]); }
   }
   return { walls, entranceCol, exitCol, sol };
 }
